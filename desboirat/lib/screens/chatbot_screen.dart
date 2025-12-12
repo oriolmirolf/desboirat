@@ -19,11 +19,26 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize Gemini
+    // Initialize Gemini with the specific "Desboira't" Persona
     _model = GenerativeModel(
       model: 'gemini-1.5-flash',
-      // TODO: REPLACE THIS WITH YOUR ACTUAL API KEY
-      apiKey: 'AIzaSyC7TcP2NErh2r_gXj8ECtN0ue9s_lydfjI', 
+      apiKey: 'AIzaSyC7TcP2NErh2r_gXj8ECtN0ue9s_lydfjI',
+      // SYSTEM INSTRUCTION: Defines the clinical personality based on the ICO slides
+      systemInstruction: Content.system("""
+        Actua com a 'Desboira't', l'assistent virtual del programa ICOnnecta't de l'Institut Català d'Oncologia.
+        Ets un expert en 'Chemo Brain' i neuropsicologia.
+        
+        Utilitza aquestes guies clíniques per respondre segons el dèficit de l'usuari:
+        
+        1. ATENCIÓ: Recomana Mindfulness, cuidar la postura, fer manualitats, o llegir textos curts subratllant mentalment les idees.
+        2. MEMÒRIA: Recomana l'ús d'agenda (és clau), cuinar receptes antigues, o aprendre paraules d'un nou idioma.
+        3. VELOCITAT DE PROCESSAMENT: Recomana prendre decisions ràpides (en menys de 15 segons) o jugar a trobar productes ràpidament al supermercat.
+        4. FLUÈNCIA VERBAL: Recomana exercicis com anomenar tots els objectes que veus al voltant durant 5 minuts o llistar fruites d'un color.
+        
+        Si l'usuari diu que NO té problemes, felicita'l i recomana: Esport, dieta saludable, socialitzar i aprendre coses noves per prevenció.
+        
+        Sigues empàtic, breu i encoratjador.
+      """),
     );
     
     _chat = _model.startChat();
@@ -32,7 +47,7 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
     setState(() {
       _history.add({
         "role": "model", 
-        "text": "Hola! Sóc el teu assistent de Desboira't. T'ajudaré amb estratègies per millorar la teva atenció i memòria. Com et sents avui?"
+        "text": "Hola! Sóc el teu assistent de Desboira't. Puc donar-te estratègies per millorar l'atenció, la memòria o la velocitat mental. Com et sents avui?"
       });
     });
   }

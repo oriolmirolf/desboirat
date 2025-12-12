@@ -1,14 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'dart:math';
 
-class MemoryTestScreen extends StatefulWidget {
+class DigitSpanTest extends StatefulWidget {
+  final bool isReverse; // True = Working Memory, False = Attention
+  DigitSpanTest({required this.isReverse});
+
   @override
-  _MemoryTestScreenState createState() => _MemoryTestScreenState();
+  _DigitSpanTestState createState() => _DigitSpanTestState();
 }
 
-class _MemoryTestScreenState extends State<MemoryTestScreen> {
+class _DigitSpanTestState extends State<DigitSpanTest> {
   List<int> _sequence = [];
-  int _level = 3; // Start with 3 digits
+  int _digits = 3; // Start with 3 digits
+  int _lives = 2;  // Fail 2 times at same level = Game Over (Slide 46)
+  
   String _displayNumber = "";
   bool _showInput = false;
   TextEditingController _controller = TextEditingController();
@@ -16,75 +22,108 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
 
   void _startGame() {
     setState(() {
-      _sequence = List.generate(_level, (index) => (index + 1) * 2 % 9 + 1); // Simple random-ish gen
-      _sequence.shuffle();
+      _generateSequence();
       _showInput = false;
       _controller.clear();
-      _message = "Memoritza la seqüència...";
+      _message = widget.isReverse 
+          ? "Memoritza (s'haurà de dir AL REVÉS)" 
+          : "Memoritza (s'haurà de dir IGUAL)";
     });
     _playSequence();
+  }
+
+  void _generateSequence() {
+    var rng = Random();
+    _sequence = List.generate(_digits, (_) => rng.nextInt(9) + 1); // 1-9
   }
 
   void _playSequence() async {
     for (int num in _sequence) {
       setState(() => _displayNumber = num.toString());
       await Future.delayed(Duration(milliseconds: 1000));
-      setState(() => _displayNumber = ""); // clear for blinking effect
+      setState(() => _displayNumber = ""); 
       await Future.delayed(Duration(milliseconds: 200));
     }
     setState(() {
       _displayNumber = "?";
       _showInput = true;
-      _message = "Escriu els números AL REVÉS";
+      _message = widget.isReverse ? "Escriu AL REVÉS" : "Escriu en el MATEIX ORDRE";
     });
   }
 
   void _checkAnswer() {
-    // Reverse the input string and parse
     String input = _controller.text;
-    List<int> userNumbers = input.split('').map((e) => int.tryParse(e) ?? -1).toList();
+    // Normalize input (remove spaces/dashes)
+    String cleanInput = input.replaceAll(RegExp(r'[^0-9]'), '');
     
-    // Create the correct reverse sequence
-    List<int> correctReverse = List.from(_sequence.reversed);
+    String correctStr = widget.isReverse 
+        ? _sequence.reversed.join() 
+        : _sequence.join();
 
-    bool correct = userNumbers.join() == correctReverse.join();
-
-    if (correct) {
-      showDialog(
-        context: context, 
-        builder: (_) => AlertDialog(
-          title: Text("Correcte!"),
-          content: Text("Molt bé! Passem al següent nivell."),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                setState(() => _level++); // Increase difficulty
-                _startGame();
-              }, 
-              child: Text("Següent")
-            )
-          ],
-        )
-      );
+    if (cleanInput == correctStr) {
+      // Correct! Reset lives and increase difficulty
+      setState(() {
+        _digits++;
+        _lives = 2; 
+        _message = "Correcte! Nivell següent: $_digits dígits";
+        _showInput = false;
+      });
+      Future.delayed(Duration(seconds: 1), _startGame);
     } else {
-      setState(() => _message = "Incorrecte. Era: ${correctReverse.join('-')}");
+      // Incorrect
+      setState(() {
+        _lives--;
+      });
+      
+      if (_lives == 0) {
+         _showGameOver();
+      } else {
+        setState(() {
+          _message = "Incorrecte. Et queda 1 intent amb $_digits dígits.";
+          _generateSequence(); // Try different numbers same length
+          _showInput = false;
+        });
+        Future.delayed(Duration(seconds: 2), _playSequence);
+      }
     }
+    _controller.clear();
+  }
+
+  void _showGameOver() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: Text("Test Finalitzat"),
+        content: Text("Has arribat a recordar $_digits dígits."),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Back to menu
+            },
+            child: Text("Sortir"),
+          )
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Memòria de Treball")),
+      appBar: AppBar(title: Text(widget.isReverse ? "Memòria de Treball" : "Atenció")),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(_message, style: TextStyle(fontSize: 18, color: Colors.grey[700])),
+            Text("Vides: $_lives", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            SizedBox(height: 20),
+            Text(_message, style: TextStyle(fontSize: 18)),
             SizedBox(height: 40),
             Text(
               _displayNumber,
-              style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+              style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: Colors.blue),
             ),
             SizedBox(height: 40),
             if (_showInput)
@@ -94,12 +133,12 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
                   controller: _controller,
                   keyboardType: TextInputType.number,
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 24, letterSpacing: 5),
-                  decoration: InputDecoration(hintText: "Escriu aquí"),
+                  decoration: InputDecoration(border: OutlineInputBorder()),
+                  onSubmitted: (_) => _checkAnswer(),
                 ),
               ),
             SizedBox(height: 20),
-            if (!_showInput)
+            if (!_showInput && _displayNumber == "")
               ElevatedButton(onPressed: _startGame, child: Text("INICIAR")),
             if (_showInput)
               ElevatedButton(onPressed: _checkAnswer, child: Text("COMPROVAR")),

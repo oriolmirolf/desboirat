@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart'; // To navigate back
+// import 'home_screen.dart'; // To navigate back
 
 class SubjectiveTestScreen extends StatefulWidget {
   @override
@@ -7,12 +7,28 @@ class SubjectiveTestScreen extends StatefulWidget {
 }
 
 class _SubjectiveTestScreenState extends State<SubjectiveTestScreen> {
-  // Questions from the presentation slides
-  final List<String> _questions = [
-    "He tingut problemes per concentrar-me",
-    "He sentit una 'nebulosa mental'",
-    "He oblidat noms d'objectes o persones",
-    "He pensat més lentament de l'habitual"
+  // Questions mapped to domains based on Slides 65 & 74
+  final List<Map<String, dynamic>> _questions = [
+    {
+      "text": "He tingut problemes per concentrar-me o he perdut el fil de converses.",
+      "domain": "Atenció"
+    },
+    {
+      "text": "He pensat més lentament de l'habitual.",
+      "domain": "Velocitat"
+    },
+    {
+      "text": "He tingut la paraula 'a la punta de la llengua' o no m'ha sortit.",
+      "domain": "Fluència"
+    },
+    {
+      "text": "He oblidat on he posat coses o informació recent.",
+      "domain": "Memòria"
+    },
+    {
+      "text": "He sentit una 'nebulosa mental' (brain fog).",
+      "domain": "Funcions Executives"
+    },
   ];
 
   // Map to store answers (0-4)
@@ -49,7 +65,11 @@ class _SubjectiveTestScreenState extends State<SubjectiveTestScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_questions[index], style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  // FIX: Access the 'text' property of the map
+                  Text(
+                    _questions[index]['text'], 
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                  ),
                   Slider(
                     value: _answers[index] ?? 0,
                     min: 0,

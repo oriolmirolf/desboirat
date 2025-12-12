@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Import this
 import 'package:google_fonts/google_fonts.dart';
-import 'screens/home_screen.dart'; // We will create this next
+import 'screens/home_screen.dart';
 
-void main() {
+Future<void> main() async {
+  // Ensure Flutter bindings are initialized
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load the .env file
+  await dotenv.load(fileName: ".env");
+
   runApp(DesboiratApp());
 }
 
@@ -13,9 +20,9 @@ class DesboiratApp extends StatelessWidget {
       title: "Desboira't",
       theme: ThemeData(
         primarySwatch: Colors.blue,
-        textTheme: GoogleFonts.latoTextTheme(), // Nice font
+        textTheme: GoogleFonts.latoTextTheme(),
       ),
-      home: HomeScreen(), // Points to your Dashboard
+      home: HomeScreen(),
     );
   }
 }
