@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import '../services/local_dictionary.dart'; // Make sure this file exists!
+import '../services/local_dictionary.dart'; 
+import '../services/database_service.dart'; // ADDED THIS IMPORT
 
 class FluencyTestScreen extends StatefulWidget {
   @override
@@ -175,6 +176,14 @@ class _FluencyTestScreenState extends State<FluencyTestScreen> {
   // --- UI ---
 
   void _showFinalScore() {
+    // --- DATABASE SAVE ---
+    DatabaseService().saveResult('fluencia_verbal', {
+      'score': _validSequence.length,
+      'words_found': _validSequence,
+      'target_letter': _targetLetter,
+      'target_category': _targetCategory,
+    });
+
     showDialog(
       context: context,
       barrierDismissible: false,

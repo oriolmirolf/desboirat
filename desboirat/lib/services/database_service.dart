@@ -5,36 +5,34 @@ class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Get current User ID
   String? get uid => _auth.currentUser?.uid;
 
-  // 1. Link Patient to Doctor
-  Future<void> linkDoctor(String doctorId) async {
+  // --- LINK DOCTOR (For QR Code) ---
+  Future<void> linkDoctor(String doctorUID) async {
     if (uid == null) return;
     
+    // Save the link AND the email so the doctor sees the patient's name
     await _db.collection('users').doc(uid).set({
-      'doctorId': doctorId,
-      'lastActive': DateTime.now(),
-      'email': _auth.currentUser?.email,
-    }, SetOptions(merge: true));
+      'doctorId': doctorUID,
+      'email': _auth.currentUser?.email, 
+      'lastActive': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true)); 
   }
 
-  // 2. Check if linked
   Future<bool> isLinkedToDoctor() async {
     if (uid == null) return false;
     final doc = await _db.collection('users').doc(uid).get();
     return doc.exists && doc.data()?['doctorId'] != null;
   }
 
-  // 3. Save Test Results
+  // --- SAVE RESULTS (Universal Method) ---
   Future<void> saveResult(String testName, Map<String, dynamic> data) async {
     if (uid == null) return;
 
-    // Save to a sub-collection 'results' under the user
     await _db.collection('users').doc(uid).collection('results').add({
       'testName': testName,
-      'timestamp': DateTime.now(),
-      ...data, // Spreads the score data (e.g. {'score': 5, 'details': '...'})
+      'timestamp': FieldValue.serverTimestamp(), // Server time is best for sorting
+      ...data,
     });
   }
 }

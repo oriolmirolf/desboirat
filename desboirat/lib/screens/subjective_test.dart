@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart'; // Ensure this path is correct
+import '../services/database_service.dart'; // ADDED THIS IMPORT
 
 class SubjectiveTestScreen extends StatefulWidget {
   @override
@@ -70,14 +71,23 @@ class _SubjectiveTestScreenState extends State<SubjectiveTestScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                       elevation: 5,
                     ),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("Respostes guardades!"),
-                          backgroundColor: AppColors.deepSlate,
-                        )
-                      );
-                      Navigator.pop(context);
+                    onPressed: () async {
+                      // --- DATABASE SAVE ---
+                      // We convert keys to String because Firestore maps require String keys
+                      await DatabaseService().saveResult('qüestionari_subjectiu', {
+                        'answers_map': _answers.map((k, v) => MapEntry(k.toString(), v)),
+                        'domains': _questions.map((q) => q['domain']).toList(),
+                      });
+
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Respostes guardades!"),
+                            backgroundColor: AppColors.deepSlate,
+                          )
+                        );
+                        Navigator.pop(context);
+                      }
                     },
                     child: Text(
                       "ENVIAR RESULTATS", 

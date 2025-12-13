@@ -22,7 +22,7 @@
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, query, where, onSnapshot, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // --- 🔴 YOUR REAL CONFIGURATION IS NOW HERE 🔴 ---
+        // --- 🔴 YOUR REAL CONFIGURATION 🔴 ---
         const firebaseConfig = {
             apiKey: "AIzaSyDPLgw_-KggBhUAVwjpZnA9f3zWgZ-Qfg4",
             authDomain: "desboirat.firebaseapp.com",
@@ -32,7 +32,6 @@
             appId: "1:207065876556:web:f7e50605d0b0711d3d4ce9",
             measurementId: "G-H4NPWJLEB4"
         };
-
         // --- 🔴 END CONFIG 🔴 ---
 
         // Initialize
@@ -45,48 +44,32 @@
         let currentUser = null;
 
         // --- AUTH HANDLERS ---
-        
-        // 1. Email Login
         window.login = async () => {
             const email = document.getElementById('email').value;
             const pass = document.getElementById('password').value;
             if(!email || !pass) return alert("Si us plau, omple tots els camps.");
-            
-            try {
-                await signInWithEmailAndPassword(auth, email, pass);
-            } catch (e) { alert("Error: " + e.message); }
+            try { await signInWithEmailAndPassword(auth, email, pass); } 
+            catch (e) { alert("Error: " + e.message); }
         };
 
-        // 2. Google Login
         window.loginGoogle = async () => {
-            try {
-                await signInWithPopup(auth, googleProvider);
-            } catch (e) { 
-                console.error(e);
-                alert("Error Google: " + e.message); 
-            }
+            try { await signInWithPopup(auth, googleProvider); } 
+            catch (e) { console.error(e); alert("Error Google: " + e.message); }
         };
 
-        // 3. Register
         window.register = async () => {
             const email = document.getElementById('email').value;
             const pass = document.getElementById('password').value;
-            
             if(!email.includes('@')) return alert("Correu invàlid.");
             if(pass.length < 6) return alert("La contrasenya ha de tenir 6 caràcters.");
-
             try {
                 await createUserWithEmailAndPassword(auth, email, pass);
                 alert("Compte creat! Ara estàs connectat.");
-            } catch (e) { 
-                console.error(e);
-                alert("Error al registrar: " + e.code); 
-            }
+            } catch (e) { console.error(e); alert("Error al registrar: " + e.code); }
         };
 
         window.logout = () => signOut(auth);
 
-        // --- AUTH OBSERVER ---
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
             const loginScreen = document.getElementById('login-screen');
@@ -149,44 +132,98 @@
             });
         }
 
+        // --- UPDATED: HANDLES ALL GAME TYPES ---
         window.loadPatientDetails = async (patientId, email) => {
             document.getElementById('selected-patient-name').innerText = email || "Pacient";
             document.getElementById('empty-state').classList.add('hidden');
             document.getElementById('patient-stats').classList.remove('hidden');
             
-            if(window.myChart) window.myChart.destroy();
-
             const resultsRef = collection(db, `users/${patientId}/results`);
-            const q = query(resultsRef, orderBy("timestamp", "asc"));
+            const q = query(resultsRef, orderBy("timestamp", "desc")); // Newest first
             const snapshot = await getDocs(q);
             
-            const dataPoints = [];
-            const labels = [];
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = ""; // Clear old list
+
+            // Arrays for the chart (Fluency only for visual simplicity)
+            const fluencyPoints = [];
+            const fluencyLabels = [];
 
             snapshot.forEach(doc => {
                 const d = doc.data();
-                if(d.testName === 'fluencia_verbal') {
-                    const date = new Date(d.timestamp.seconds * 1000).toLocaleDateString();
-                    dataPoints.push(d.score);
-                    labels.push(date);
+                const dateRaw = d.timestamp ? new Date(d.timestamp.seconds * 1000) : new Date();
+                const dateStr = dateRaw.toLocaleString();
+                
+                let icon = "ph-question";
+                let color = "bg-gray-100 text-gray-600";
+                let details = "";
+                let title = "Test desconegut";
+
+                // --- LOGIC TO HANDLE EACH GAME TYPE ---
+                if (d.testName === 'fluencia_verbal') {
+                    title = "Fluència Verbal";
+                    icon = "ph-microphone";
+                    color = "bg-blue-100 text-blue-600";
+                    details = `<span class="font-bold text-blue-700">${d.score} paraules</span> (Lletra/Cat: ${d.target_letter || d.target_category || '?'})`;
+                    
+                    // Add to Chart (reverse order later for graph)
+                    fluencyPoints.unshift(d.score);
+                    fluencyLabels.unshift(dateRaw.toLocaleDateString());
+                } 
+                else if (d.testName === 'memoria_treball' || d.testName === 'atencio') {
+                    title = d.testName === 'memoria_treball' ? "Memòria de Treball" : "Atenció";
+                    icon = "ph-brain";
+                    color = "bg-purple-100 text-purple-600";
+                    details = `<span class="font-bold text-purple-700">${d.score} dígits</span> (${d.test_type})`;
                 }
+                else if (d.testName === 'velocitat_processament') {
+                    title = "Velocitat";
+                    icon = "ph-lightning";
+                    color = "bg-yellow-100 text-yellow-600";
+                    details = `<span class="font-bold text-yellow-700">${d.score_time_seconds.toFixed(2)} segons</span>`;
+                }
+                else if (d.testName === 'qüestionari_subjectiu') {
+                    title = "Autoavaluació";
+                    icon = "ph-clipboard-text";
+                    color = "bg-green-100 text-green-600";
+                    details = `<span class="font-bold text-green-700">Completat</span>`;
+                }
+
+                // Add Row to History Table
+                const row = document.createElement('tr');
+                row.className = "border-b hover:bg-gray-50";
+                row.innerHTML = `
+                    <td class="p-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full ${color} flex items-center justify-center">
+                                <i class="ph ${icon}"></i>
+                            </div>
+                            <span class="font-medium">${title}</span>
+                        </div>
+                    </td>
+                    <td class="p-3 text-right">${details}</td>
+                    <td class="p-3 text-right text-xs text-gray-500">${dateStr}</td>
+                `;
+                historyList.appendChild(row);
             });
 
+            // Update Chart (Fluency)
+            if(window.myChart) window.myChart.destroy();
             const ctx = document.getElementById('mainChart').getContext('2d');
             window.myChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: labels,
+                    labels: fluencyLabels,
                     datasets: [{
-                        label: 'Paraules Recordades',
-                        data: dataPoints,
-                        borderColor: '#4f46e5',
-                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        label: 'Evolució Fluència Verbal',
+                        data: fluencyPoints,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
                         fill: true,
                         tension: 0.4
                     }]
                 },
-                options: { responsive: true }
+                options: { responsive: true, maintainAspectRatio: false }
             });
         }
     </script>
@@ -197,22 +234,13 @@
                 <h1 class="text-3xl font-bold text-blue-600">Desboira't PRO</h1>
                 <p class="text-gray-400">Portal del Metge</p>
             </div>
-
             <input type="email" id="email" placeholder="Correu electrònic" class="w-full p-3 mb-3 border rounded-lg bg-gray-50">
             <input type="password" id="password" placeholder="Contrasenya" class="w-full p-3 mb-6 border rounded-lg bg-gray-50">
-
-            <button onclick="login()" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 transition mb-3">
-                Entrar
-            </button>
-            
+            <button onclick="login()" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 transition mb-3">Entrar</button>
             <button onclick="loginGoogle()" class="w-full border border-gray-300 text-gray-700 p-3 rounded-lg font-medium hover:bg-gray-50 transition flex items-center justify-center gap-2 mb-4">
-                <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5">
-                Entrar amb Google
+                <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5"> Entrar amb Google
             </button>
-
-            <div class="text-center">
-                <button onclick="register()" class="text-sm text-blue-500 hover:underline">Crear compte nou</button>
-            </div>
+            <div class="text-center"><button onclick="register()" class="text-sm text-blue-500 hover:underline">Crear compte nou</button></div>
         </div>
     </div>
 
@@ -221,9 +249,7 @@
             <div class="p-6">
                 <h2 class="text-2xl font-bold text-blue-600 mb-8">Desboira't</h2>
                 <nav class="space-y-2">
-                    <a href="#" class="flex items-center gap-3 p-3 bg-blue-50 text-blue-600 rounded-lg font-medium">
-                        <i class="ph ph-users-three text-xl"></i> Pacients
-                    </a>
+                    <a href="#" class="flex items-center gap-3 p-3 bg-blue-50 text-blue-600 rounded-lg font-medium"><i class="ph ph-users-three text-xl"></i> Pacients</a>
                 </nav>
             </div>
             <div class="p-4 border-t bg-gray-50">
@@ -235,7 +261,6 @@
 
         <main class="ml-64 flex-1 p-8">
             <div class="grid grid-cols-12 gap-6 h-full">
-                
                 <div class="col-span-4 flex flex-col gap-6">
                     <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg text-center">
                         <p class="text-sm opacity-80 mb-4">Escaneja per vincular pacient</p>
@@ -244,38 +269,41 @@
                         </div>
                         <div class="mt-4 bg-white/20 p-2 rounded text-xs font-mono select-all cursor-pointer" id="doctor-uid">...</div>
                     </div>
-
                     <div class="bg-white rounded-2xl shadow-sm border flex-1 flex flex-col overflow-hidden h-[500px]">
                         <div class="p-4 border-b font-bold text-gray-700 flex justify-between">
                             <span>Pacients</span>
                             <span class="bg-blue-100 text-blue-700 px-2 rounded-full text-xs flex items-center" id="total-patients">0</span>
                         </div>
-                        <div id="patient-list" class="overflow-y-auto flex-1">
-                            </div>
+                        <div id="patient-list" class="overflow-y-auto flex-1"></div>
                     </div>
                 </div>
 
                 <div class="col-span-8">
-                    <div class="bg-white rounded-2xl shadow-sm border p-8 h-full relative">
+                    <div class="bg-white rounded-2xl shadow-sm border p-8 h-full relative flex flex-col">
                         <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-gray-300">
                             <i class="ph ph-chart-line-up text-6xl mb-4"></i>
                             <p>Selecciona un pacient per veure dades</p>
                         </div>
 
                         <div id="patient-stats" class="hidden h-full flex flex-col">
-                            <div class="flex justify-between items-end mb-6">
-                                <div>
-                                    <p class="text-sm text-gray-400 uppercase font-bold">Historial Clínic</p>
-                                    <h2 class="text-3xl font-bold text-gray-800" id="selected-patient-name">...</h2>
-                                </div>
-                            </div>
-                            <div class="flex-1 bg-gray-50 rounded-xl p-4 border border-gray-100">
+                            <h2 class="text-2xl font-bold text-gray-800 mb-6" id="selected-patient-name">...</h2>
+                            
+                            <div class="h-64 bg-gray-50 rounded-xl p-4 border border-gray-100 mb-6">
                                 <canvas id="mainChart"></canvas>
+                            </div>
+
+                            <div class="flex-1 overflow-hidden flex flex-col">
+                                <h3 class="font-bold text-gray-700 mb-3">Historial d'Activitat Recent</h3>
+                                <div class="flex-1 overflow-y-auto border rounded-xl">
+                                    <table class="w-full text-sm text-left">
+                                        <tbody id="history-list">
+                                            </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-
             </div>
         </main>
     </div>

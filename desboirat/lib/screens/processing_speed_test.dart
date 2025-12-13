@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart'; // Ensure this path is correct
+import '../services/database_service.dart'; // ADDED THIS IMPORT
 
 class ProcessingSpeedTest extends StatefulWidget {
   @override
@@ -76,6 +77,13 @@ class _ProcessingSpeedTestState extends State<ProcessingSpeedTest> {
   }
 
   void _showResult() {
+    double seconds = stopwatch.elapsedMilliseconds / 1000;
+    
+    // --- DATABASE SAVE ---
+    DatabaseService().saveResult('velocitat_processament', {
+      'score_time_seconds': seconds,
+    });
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -91,7 +99,7 @@ class _ProcessingSpeedTestState extends State<ProcessingSpeedTest> {
             Icon(Icons.timer, size: 50, color: AppColors.deepSlate),
             SizedBox(height: 10),
             Text(
-              "Temps: ${(stopwatch.elapsedMilliseconds / 1000).toStringAsFixed(1)}s",
+              "Temps: ${seconds.toStringAsFixed(1)}s",
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.deepSlate)
             ),
           ],
