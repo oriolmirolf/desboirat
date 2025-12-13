@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import '../theme/app_colors.dart'; // Ensure this matches your folder structure
 import '../services/database_service.dart'; // ADDED THIS IMPORT
+import '../services/daily_tracker.dart';
 
 class DigitSpanTest extends StatefulWidget {
   final bool isReverse; // True = Working Memory, False = Attention
@@ -102,6 +103,12 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
       'score': _digits - 1, // Max digits successfully remembered
       'test_type': widget.isReverse ? 'reverse' : 'forward',
     });
+
+    if (widget.isReverse) {
+      DailyTracker.markAsDone(DailyTracker.KEY_MEMORY);
+    } else {
+      DailyTracker.markAsDone(DailyTracker.KEY_ATTENTION);
+    }
 
     showDialog(
       context: context,

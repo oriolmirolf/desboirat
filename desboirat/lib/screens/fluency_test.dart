@@ -5,6 +5,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../services/local_dictionary.dart'; 
 import '../services/database_service.dart'; // Keeping your import
 import '../theme/app_colors.dart'; // IMPORT THEME
+import '../services/daily_tracker.dart';
 
 class FluencyTestScreen extends StatefulWidget {
   @override
@@ -184,6 +185,8 @@ class _FluencyTestScreenState extends State<FluencyTestScreen> {
       'target_letter': _targetLetter,
       'target_category': _targetCategory,
     });
+
+    DailyTracker.markAsDone(DailyTracker.KEY_FLUENCY);
 
     showDialog(
       context: context,

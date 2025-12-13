@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart'; // Ensure this path is correct
 import '../services/database_service.dart'; // ADDED THIS IMPORT
+import '../services/daily_tracker.dart';
 
 class ProcessingSpeedTest extends StatefulWidget {
   @override
@@ -83,6 +84,8 @@ class _ProcessingSpeedTestState extends State<ProcessingSpeedTest> {
     DatabaseService().saveResult('velocitat_processament', {
       'score_time_seconds': seconds,
     });
+
+    DailyTracker.markAsDone(DailyTracker.KEY_SPEED);
 
     showDialog(
       context: context,

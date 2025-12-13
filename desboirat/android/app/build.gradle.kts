@@ -12,6 +12,7 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -48,6 +49,8 @@ dependencies {
     // Import the Firebase BoM (Bill of Materials)
     // This manages the versions of all Firebase libraries for you
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
     // Add the dependencies for the Firebase products you want to use
     // No need to specify versions because the BoM handles it

@@ -37,9 +37,11 @@ class NotificationService {
       body,
       _nextInstanceOfTime(hour, minute),
       const NotificationDetails(
-        android: NotificationDetails(
-          channelId: 'daily_reminders',
-          channelName: 'Recordatoris Diaris',
+        // FIXED HERE: Use AndroidNotificationDetails and Positional Arguments
+        android: AndroidNotificationDetails(
+          'daily_reminders',       // 1. Channel ID (Positional)
+          'Recordatoris Diaris',   // 2. Channel Name (Positional)
+          channelDescription: 'Recordatoris per fer els tests',
           importance: Importance.max,
           priority: Priority.high,
         ),

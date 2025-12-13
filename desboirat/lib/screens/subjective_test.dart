@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // IMPORT THIS
 import '../theme/app_colors.dart';
 import '../services/database_service.dart';
+import '../services/daily_tracker.dart';
 
 class SubjectiveTestScreen extends StatefulWidget {
   @override
@@ -134,6 +135,8 @@ class _SubjectiveTestScreenState extends State<SubjectiveTestScreen> {
                         'affected_domains': affectedDomains, // <--- Storing the result here too
                         'timestamp': DateTime.now().toIso8601String(),
                       });
+
+                      DailyTracker.markAsDone(DailyTracker.KEY_SUBJECTIVE);
 
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
