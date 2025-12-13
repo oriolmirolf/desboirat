@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desboira't PRO - Portal Mèdic</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body { background-color: #f3f4f6; font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, query, where, onSnapshot, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // --- 🔴 YOUR REAL CONFIGURATION IS NOW HERE 🔴 ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDPLgw_-KggBhUAVwjpZnA9f3zWgZ-Qfg4",
+            authDomain: "desboirat.firebaseapp.com",
+            projectId: "desboirat",
+            storageBucket: "desboirat.firebasestorage.app",
+            messagingSenderId: "207065876556",
+            appId: "1:207065876556:web:f7e50605d0b0711d3d4ce9",
+            measurementId: "G-H4NPWJLEB4"
+        };
+
+        // --- 🔴 END CONFIG 🔴 ---
+
+        // Initialize
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const googleProvider = new GoogleAuthProvider();
+
+        // STATE
+        let currentUser = null;
+
+        // --- AUTH HANDLERS ---
+        
+        // 1. Email Login
+        window.login = async () => {
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('password').value;
+            if(!email || !pass) return alert("Si us plau, omple tots els camps.");
+            
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (e) { alert("Error: " + e.message); }
+        };
+
+        // 2. Google Login
+        window.loginGoogle = async () => {
+            try {
+                await signInWithPopup(auth, googleProvider);
+            } catch (e) { 
+                console.error(e);
+                alert("Error Google: " + e.message); 
+            }
+        };
+
+        // 3. Register
+        window.register = async () => {
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('password').value;
+            
+            if(!email.includes('@')) return alert("Correu invàlid.");
+            if(pass.length < 6) return alert("La contrasenya ha de tenir 6 caràcters.");
+
+            try {
+                await createUserWithEmailAndPassword(auth, email, pass);
+                alert("Compte creat! Ara estàs connectat.");
+            } catch (e) { 
+                console.error(e);
+                alert("Error al registrar: " + e.code); 
+            }
+        };
+
+        window.logout = () => signOut(auth);
+
+        // --- AUTH OBSERVER ---
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            const loginScreen = document.getElementById('login-screen');
+            const dashboardScreen = document.getElementById('dashboard-screen');
+
+            if (user) {
+                loginScreen.classList.add('hidden');
+                dashboardScreen.classList.remove('hidden');
+                document.getElementById('doctor-email').innerText = user.email;
+                generateQR(user.uid);
+                loadPatients(user.uid);
+            } else {
+                loginScreen.classList.remove('hidden');
+                dashboardScreen.classList.add('hidden');
+            }
+        });
+
+        // --- APP LOGIC ---
+
+        function generateQR(uid) {
+            const url = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${uid}`;
+            document.getElementById('qr-img').src = url;
+            document.getElementById('doctor-uid').innerText = uid;
+        }
+
+        function loadPatients(doctorId) {
+            const q = query(collection(db, "users"), where("doctorId", "==", doctorId));
+            
+            onSnapshot(q, (snapshot) => {
+                const list = document.getElementById('patient-list');
+                list.innerHTML = "";
+                let total = 0;
+                
+                if (snapshot.empty) {
+                    list.innerHTML = `<div class="p-8 text-center text-gray-400">Cap pacient vinculat encara.</div>`;
+                    return;
+                }
+
+                snapshot.forEach(doc => {
+                    total++;
+                    const data = doc.data();
+                    const el = document.createElement('div');
+                    el.className = "p-4 border-b hover:bg-blue-50 cursor-pointer transition flex justify-between items-center bg-white";
+                    el.onclick = () => loadPatientDetails(doc.id, data.email);
+                    el.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
+                                ${data.email ? data.email[0].toUpperCase() : '?'}
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">${data.email || 'Anònim'}</p>
+                                <p class="text-xs text-gray-400">ID: ${doc.id.slice(0,6)}...</p>
+                            </div>
+                        </div>
+                        <i class="ph ph-caret-right text-gray-400"></i>
+                    `;
+                    list.appendChild(el);
+                });
+                document.getElementById('total-patients').innerText = total;
+            });
+        }
+
+        window.loadPatientDetails = async (patientId, email) => {
+            document.getElementById('selected-patient-name').innerText = email || "Pacient";
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('patient-stats').classList.remove('hidden');
+            
+            if(window.myChart) window.myChart.destroy();
+
+            const resultsRef = collection(db, `users/${patientId}/results`);
+            const q = query(resultsRef, orderBy("timestamp", "asc"));
+            const snapshot = await getDocs(q);
+            
+            const dataPoints = [];
+            const labels = [];
+
+            snapshot.forEach(doc => {
+                const d = doc.data();
+                if(d.testName === 'fluencia_verbal') {
+                    const date = new Date(d.timestamp.seconds * 1000).toLocaleDateString();
+                    dataPoints.push(d.score);
+                    labels.push(date);
+                }
+            });
+
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            window.myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Paraules Recordades',
+                        data: dataPoints,
+                        borderColor: '#4f46e5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: { responsive: true }
+            });
+        }
+    </script>
+
+    <div id="login-screen" class="min-h-screen flex items-center justify-center bg-gray-100 fade-in">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-96">
+            <div class="text-center mb-6">
+                <h1 class="text-3xl font-bold text-blue-600">Desboira't PRO</h1>
+                <p class="text-gray-400">Portal del Metge</p>
+            </div>
+
+            <input type="email" id="email" placeholder="Correu electrònic" class="w-full p-3 mb-3 border rounded-lg bg-gray-50">
+            <input type="password" id="password" placeholder="Contrasenya" class="w-full p-3 mb-6 border rounded-lg bg-gray-50">
+
+            <button onclick="login()" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 transition mb-3">
+                Entrar
+            </button>
+            
+            <button onclick="loginGoogle()" class="w-full border border-gray-300 text-gray-700 p-3 rounded-lg font-medium hover:bg-gray-50 transition flex items-center justify-center gap-2 mb-4">
+                <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5">
+                Entrar amb Google
+            </button>
+
+            <div class="text-center">
+                <button onclick="register()" class="text-sm text-blue-500 hover:underline">Crear compte nou</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard-screen" class="hidden min-h-screen flex bg-gray-50 fade-in">
+        <aside class="w-64 bg-white border-r flex flex-col justify-between fixed h-full z-10">
+            <div class="p-6">
+                <h2 class="text-2xl font-bold text-blue-600 mb-8">Desboira't</h2>
+                <nav class="space-y-2">
+                    <a href="#" class="flex items-center gap-3 p-3 bg-blue-50 text-blue-600 rounded-lg font-medium">
+                        <i class="ph ph-users-three text-xl"></i> Pacients
+                    </a>
+                </nav>
+            </div>
+            <div class="p-4 border-t bg-gray-50">
+                <p class="text-xs font-bold text-gray-500 uppercase mb-1">Doctor</p>
+                <p class="text-sm font-bold truncate" id="doctor-email">...</p>
+                <button onclick="logout()" class="text-red-500 text-sm mt-2 hover:underline">Tancar Sessió</button>
+            </div>
+        </aside>
+
+        <main class="ml-64 flex-1 p-8">
+            <div class="grid grid-cols-12 gap-6 h-full">
+                
+                <div class="col-span-4 flex flex-col gap-6">
+                    <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg text-center">
+                        <p class="text-sm opacity-80 mb-4">Escaneja per vincular pacient</p>
+                        <div class="bg-white p-3 rounded-xl inline-block shadow-inner">
+                            <img id="qr-img" src="" class="w-32 h-32">
+                        </div>
+                        <div class="mt-4 bg-white/20 p-2 rounded text-xs font-mono select-all cursor-pointer" id="doctor-uid">...</div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-sm border flex-1 flex flex-col overflow-hidden h-[500px]">
+                        <div class="p-4 border-b font-bold text-gray-700 flex justify-between">
+                            <span>Pacients</span>
+                            <span class="bg-blue-100 text-blue-700 px-2 rounded-full text-xs flex items-center" id="total-patients">0</span>
+                        </div>
+                        <div id="patient-list" class="overflow-y-auto flex-1">
+                            </div>
+                    </div>
+                </div>
+
+                <div class="col-span-8">
+                    <div class="bg-white rounded-2xl shadow-sm border p-8 h-full relative">
+                        <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-gray-300">
+                            <i class="ph ph-chart-line-up text-6xl mb-4"></i>
+                            <p>Selecciona un pacient per veure dades</p>
+                        </div>
+
+                        <div id="patient-stats" class="hidden h-full flex flex-col">
+                            <div class="flex justify-between items-end mb-6">
+                                <div>
+                                    <p class="text-sm text-gray-400 uppercase font-bold">Historial Clínic</p>
+                                    <h2 class="text-3xl font-bold text-gray-800" id="selected-patient-name">...</h2>
+                                </div>
+                            </div>
+                            <div class="flex-1 bg-gray-50 rounded-xl p-4 border border-gray-100">
+                                <canvas id="mainChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</body>
+</html>
