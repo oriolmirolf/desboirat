@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../theme/app_colors.dart'; // Ensure this path is correct
 
 class ChatBotScreen extends StatefulWidget {
   @override
@@ -65,7 +66,6 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
       _controller.clear();
     });
     
-    // Scroll to bottom
     _scrollToBottom();
 
     try {
@@ -97,68 +97,167 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
     });
   }
 
+  // --- WIDGETS ---
+
+  Widget _buildChatBubble(int index) {
+    final isUser = _history[index]["role"] == "user";
+    final text = _history[index]["text"]!;
+
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        child: Row(
+          mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Model Avatar (Only for model)
+            if (!isUser)
+              Container(
+                margin: EdgeInsets.only(right: 8, top: 5),
+                child: CircleAvatar(
+                  backgroundColor: AppColors.cream,
+                  radius: 16,
+                  child: Icon(Icons.smart_toy, size: 18, color: AppColors.deepSlate),
+                ),
+              ),
+
+            // The Message Bubble
+            Flexible(
+              child: Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  // THEME: SkyBlue for User, Cream for Model
+                  color: isUser ? AppColors.skyBlue : AppColors.cream,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                    bottomLeft: isUser ? Radius.circular(20) : Radius.circular(0),
+                    bottomRight: isUser ? Radius.circular(0) : Radius.circular(20),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    )
+                  ],
+                ),
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    color: AppColors.deepSlate, // THEME: Always slate text
+                    fontSize: 16,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Assistent Virtual")),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: EdgeInsets.all(16),
-              itemCount: _history.length,
-              itemBuilder: (ctx, i) {
-                final isUser = _history[i]["role"] == "user";
-                return Align(
-                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: EdgeInsets.symmetric(vertical: 5),
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isUser ? Colors.blue[100] : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(12),
+      extendBodyBehindAppBar: true, // THEME: Gradient behind AppBar
+      appBar: AppBar(
+        title: Text(
+          "Assistent Virtual", 
+          style: TextStyle(color: AppColors.deepSlate, fontWeight: FontWeight.bold)
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: IconThemeData(color: AppColors.deepSlate),
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: AppColors.mainGradient, // THEME: Main Gradient
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+                  itemCount: _history.length,
+                  itemBuilder: (ctx, i) => _buildChatBubble(i),
+                ),
+              ),
+              
+              // Loading Indicator (Thinking...)
+              if (_isLoading)
+                Padding(
+                  padding: const EdgeInsets.only(left: 50, bottom: 10),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 15, 
+                          height: 15, 
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.deepSlate)
+                        ),
+                        SizedBox(width: 10),
+                        Text(
+                          "Desboira't està escrivint...", 
+                          style: TextStyle(color: AppColors.deepSlate.withOpacity(0.6), fontStyle: FontStyle.italic)
+                        ),
+                      ],
                     ),
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                    child: Text(_history[i]["text"]!),
-                  ),
-                );
-              },
-            ),
-          ),
-          if (_isLoading)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: LinearProgressIndicator(),
-            ),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            color: Colors.white,
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: InputDecoration(
-                      hintText: "Escriu el teu dubte...",
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    onSubmitted: (_) => _sendMessage(),
                   ),
                 ),
-                SizedBox(width: 8),
-                CircleAvatar(
-                  backgroundColor: Colors.blue,
-                  child: IconButton(
-                    icon: Icon(Icons.send, color: Colors.white),
-                    onPressed: _sendMessage,
-                  ),
+
+              // --- INPUT AREA ---
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                decoration: BoxDecoration(
+                  color: AppColors.cream, // THEME: Cream bottom bar
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -5))
+                  ]
                 ),
-              ],
-            ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        style: TextStyle(color: AppColors.deepSlate),
+                        decoration: InputDecoration(
+                          hintText: "Escriu el teu dubte...",
+                          hintStyle: TextStyle(color: AppColors.deepSlate.withOpacity(0.5)),
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        ),
+                        onSubmitted: (_) => _sendMessage(),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.deepSlate, // THEME: Slate Button
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.send, color: Colors.white),
+                        onPressed: _sendMessage,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
