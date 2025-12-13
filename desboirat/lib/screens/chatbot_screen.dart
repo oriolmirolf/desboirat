@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ChatBotScreen extends StatefulWidget {
   @override
@@ -19,10 +20,12 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
   @override
   void initState() {
     super.initState();
+    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+
     // Initialize Gemini with the specific "Desboira't" Persona
     _model = GenerativeModel(
       model: 'gemini-1.5-flash',
-      apiKey: 'AIzaSyC7TcP2NErh2r_gXj8ECtN0ue9s_lydfjI',
+      apiKey: apiKey,
       // SYSTEM INSTRUCTION: Defines the clinical personality based on the ICO slides
       systemInstruction: Content.system("""
         Actua com a 'Desboira't', l'assistent virtual del programa ICOnnecta't de l'Institut Català d'Oncologia.
