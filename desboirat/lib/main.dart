@@ -1,32 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// Screens
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/qr_link_screen.dart';
 import 'services/database_service.dart';
-import 'services/notification_service.dart'; // <--- ADD THIS IMPORT
+import 'services/notification_service.dart'; 
+
+// (Note: No global boolean variables here anymore)
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   await dotenv.load(fileName: ".env");
 
-  // --- NOTIFICATION SETUP (NEW) ---
+  // 1. INITIALIZE NOTIFICATIONS
   await NotificationService().init();
   
-  // Schedule: 11:00 AM (Games) and 8:00 PM (Subjective)
+  // 2. LISTEN FOR DOCTOR TRIGGER
+  FirebaseAuth.instance.authStateChanges().listen((User? user) {
+    if (user != null) {
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots()
+          .listen((snapshot) {
+        
+        if (snapshot.exists && snapshot.data() != null && snapshot.data()!.containsKey('trigger_notification')) {
+          var data = snapshot.get('trigger_notification');
+          
+          if (data['timestamp'] != null) {
+             Timestamp ts = data['timestamp'];
+             // Only allow recent triggers (last 2 mins)
+             if (DateTime.now().difference(ts.toDate()).inSeconds < 120) {
+                 
+                 print("🔔 TRIGGER RECEIVED: Sending Notification");
+
+                 // 🔴 ALWAYS SEND "COM ET SENTS?" (No if/else logic needed)
+                 NotificationService().showInstantNotification(
+                   999, 
+                   "Com et sents?", 
+                   "Recorda anotar els teus problemes cognitius."
+                 );
+             }
+          }
+        }
+      });
+    }
+  });
+
+  // 3. SCHEDULE DAILY REMINDERS
   NotificationService().scheduleDailyNotification(
     1, "Entrena la teva ment", "Tens els jocs d'avui pendents!", 11, 00
   );
   NotificationService().scheduleDailyNotification(
     2, "Com et sents?", "Recorda anotar els teus problemes cognitius.", 20, 00
   );
-  // --------------------------------
 
   runApp(DesboiratApp());
 }
@@ -40,7 +73,7 @@ class DesboiratApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         textTheme: GoogleFonts.latoTextTheme(),
       ),
-      home: AuthGate(),
+      home: AuthGate(), 
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'dart:io'; 
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -13,13 +14,15 @@ class NotificationService {
   Future<void> init() async {
     tz.initializeTimeZones();
 
-    // Android Settings
+    // 🔴 FIX: Changed '@mipmap/ic_launcher' to '@mipmap/launcher_icon'
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@drawable/ic_notification');
 
-    // iOS Settings
     const DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings();
+        DarwinInitializationSettings(
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true);
 
     const InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
@@ -27,9 +30,17 @@ class NotificationService {
     );
 
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+    if (Platform.isAndroid) {
+      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+          flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      
+      await androidImplementation?.requestNotificationsPermission();
+    }
   }
 
-  // Schedule a daily notification
+  // 1. SCHEDULED
   Future<void> scheduleDailyNotification(int id, String title, String body, int hour, int minute) async {
     await flutterLocalNotificationsPlugin.zonedSchedule(
       id,
@@ -37,35 +48,42 @@ class NotificationService {
       body,
       _nextInstanceOfTime(hour, minute),
       const NotificationDetails(
-        // FIXED HERE: Use AndroidNotificationDetails and Positional Arguments
         android: AndroidNotificationDetails(
-          'daily_reminders',       // 1. Channel ID (Positional)
-          'Recordatoris Diaris',   // 2. Channel Name (Positional)
-          channelDescription: 'Recordatoris per fer els tests',
-          importance: Importance.max,
-          priority: Priority.high,
+          'daily_reminders', 'Recordatoris Diaris',
+          importance: Importance.max, priority: Priority.high,
         ),
         iOS: DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time, // Repeats daily at this time
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
+  }
+
+  // 2. INSTANT
+  Future<void> showInstantNotification(int id, String title, String body) async {
+    await flutterLocalNotificationsPlugin.show(
+      id,
+      title,
+      body,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'doctor_alerts', 'Alerta del Doctor',
+          importance: Importance.max, priority: Priority.high,
+          enableVibration: true,
+          playSound: true,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
     );
   }
 
   tz.TZDateTime _nextInstanceOfTime(int hour, int minute) {
     final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-    tz.TZDateTime scheduledDate =
-        tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+    tz.TZDateTime scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
     if (scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
     return scheduledDate;
-  }
-  
-  // Cancel notification (e.g., if they do the test, we stop nagging for today)
-  Future<void> cancelNotification(int id) async {
-    await flutterLocalNotificationsPlugin.cancel(id);
   }
 }
