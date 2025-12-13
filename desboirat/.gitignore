@@ -48,3 +48,4 @@ app.*.map.json
 ## other
 .env
 android/app/google-services.json
+android/build/

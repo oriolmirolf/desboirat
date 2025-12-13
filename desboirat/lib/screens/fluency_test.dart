@@ -3,7 +3,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../services/local_dictionary.dart'; 
-import '../services/database_service.dart'; // ADDED THIS IMPORT
+import '../services/database_service.dart'; // Keeping your import
+import '../theme/app_colors.dart'; // IMPORT THEME
 
 class FluencyTestScreen extends StatefulWidget {
   @override
@@ -188,10 +189,21 @@ class _FluencyTestScreenState extends State<FluencyTestScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Text("Temps esgotat!"),
-        content: Text("Has aconseguit ${_validSequence.length} paraules vàlides."),
+        backgroundColor: AppColors.cream, // THEME
+        title: Text(
+          "Temps esgotat!", 
+          style: TextStyle(color: AppColors.deepSlate, fontWeight: FontWeight.bold) // THEME
+        ),
+        content: Text(
+          "Has aconseguit ${_validSequence.length} paraules vàlides.",
+          style: TextStyle(color: AppColors.deepSlate) // THEME
+        ),
         actions: [
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.deepSlate, // THEME
+              foregroundColor: AppColors.cream,     // THEME
+            ),
             onPressed: () { 
               Navigator.pop(ctx); 
               _generateRandomChallenge(); 
@@ -210,114 +222,148 @@ class _FluencyTestScreenState extends State<FluencyTestScreen> {
     bool isNextLetter = _startWithLetter ? (count % 2 == 0) : (count % 2 != 0);
 
     return Scaffold(
-      appBar: AppBar(title: Text("Fluència Verbal")),
-      body: Column(
-        children: [
-          // 1. Header with Timer and Start Button
-          Container(
-            padding: EdgeInsets.all(20),
-            color: _isGameActive ? Colors.green[50] : Colors.blue[50],
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Temps", style: TextStyle(color: Colors.grey)),
-                    Text("$_timeLeft s", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-                  ],
+      extendBodyBehindAppBar: true, // THEME: For gradient
+      appBar: AppBar(
+        title: Text(
+          "Fluència Verbal", 
+          style: TextStyle(color: AppColors.deepSlate, fontWeight: FontWeight.bold) // THEME
+        ),
+        backgroundColor: Colors.transparent, // THEME
+        elevation: 0,
+        iconTheme: IconThemeData(color: AppColors.deepSlate), // THEME
+      ),
+      body: Container(
+        // THEME: Main Gradient Background
+        decoration: BoxDecoration(
+          gradient: AppColors.mainGradient,
+        ),
+        child: SafeArea( // Added SafeArea to ensure content is visible
+          child: Column(
+            children: [
+              // 1. Header with Timer and Start Button
+              Container(
+                padding: EdgeInsets.all(20),
+                margin: EdgeInsets.all(16), // Added margin for styling
+                decoration: BoxDecoration(
+                   // THEME: MintGreen for active, Cream for inactive
+                  color: _isGameActive ? AppColors.mintGreen.withOpacity(0.9) : AppColors.cream,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black12, blurRadius: 5, offset: Offset(0, 3))
+                  ]
                 ),
-                if (!_isGameActive)
-                  ElevatedButton.icon(
-                    onPressed: _startGame, 
-                    icon: Icon(Icons.mic), 
-                    label: Text("COMENÇAR"),
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    ),
-                  ),
-                if (_isGameActive)
-                  Chip(
-                    avatar: Icon(Icons.mic, color: Colors.white, size: 18),
-                    label: Text("Escoltant..." , style: TextStyle(color: Colors.white)),
-                    backgroundColor: Colors.orange,
-                  )
-              ],
-            ),
-          ),
-
-          // 2. The Target Cards (Dynamic Highlight)
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Expanded(child: _buildCard("LLETRA", _targetLetter, isNextLetter)),
-                SizedBox(width: 8),
-                Icon(Icons.arrow_forward, color: Colors.grey[400]),
-                SizedBox(width: 8),
-                Expanded(child: _buildCard("CATEGORIA", _targetCategory, !isNextLetter)),
-              ],
-            ),
-          ),
-
-          // 3. Live Transcript (Feedback)
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            color: Colors.grey[100],
-            child: Text(
-              _liveText.isEmpty ? "..." : "... $_liveText",
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[600], fontStyle: FontStyle.italic),
-            ),
-          ),
-
-          Divider(height: 1),
-
-          // 4. List of Validated Words
-          Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.all(16),
-              itemCount: _validSequence.length,
-              reverse: true, // Show newest items at bottom
-              itemBuilder: (context, index) {
-                int realIndex = _validSequence.length - 1 - index;
-                String word = _validSequence[realIndex];
-                bool wasLetter = _startWithLetter ? (realIndex % 2 == 0) : (realIndex % 2 != 0);
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                  child: Row(
-                    mainAxisAlignment: wasLetter ? MainAxisAlignment.start : MainAxisAlignment.end,
-                    children: [
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: wasLetter ? Colors.blue[100] : Colors.orange[100],
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))]
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Temps", style: TextStyle(color: AppColors.deepSlate.withOpacity(0.6))), // THEME
+                        Text(
+                          "$_timeLeft s", 
+                          style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.deepSlate) // THEME
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              word.toUpperCase(), 
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)
-                            ),
-                            SizedBox(width: 8),
-                            Icon(Icons.check_circle, size: 16, color: Colors.green[700]),
-                          ],
+                      ],
+                    ),
+                    if (!_isGameActive)
+                      ElevatedButton.icon(
+                        onPressed: _startGame, 
+                        icon: Icon(Icons.mic), 
+                        label: Text("COMENÇAR"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.deepSlate, // THEME
+                          foregroundColor: AppColors.cream,     // THEME
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), // Styling
                         ),
                       ),
-                    ],
+                    if (_isGameActive)
+                      Chip(
+                        avatar: Icon(Icons.mic, color: Colors.white, size: 18),
+                        label: Text("Escoltant..." , style: TextStyle(color: Colors.white)),
+                        backgroundColor: Colors.orangeAccent, // Keeping logic visible but distinct
+                      )
+                  ],
+                ),
+              ),
+
+              // 2. The Target Cards (Dynamic Highlight)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  children: [
+                    Expanded(child: _buildCard("LLETRA", _targetLetter, isNextLetter)),
+                    SizedBox(width: 8),
+                    Icon(Icons.arrow_forward, color: AppColors.deepSlate.withOpacity(0.4)), // THEME
+                    SizedBox(width: 8),
+                    Expanded(child: _buildCard("CATEGORIA", _targetCategory, !isNextLetter)),
+                  ],
+                ),
+              ),
+
+              // 3. Live Transcript (Feedback)
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Text(
+                  _liveText.isEmpty ? "..." : "... $_liveText",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.deepSlate.withOpacity(0.7), // THEME
+                    fontStyle: FontStyle.italic
                   ),
-                );
-              },
-            ),
+                ),
+              ),
+
+              Divider(height: 1, color: AppColors.deepSlate.withOpacity(0.2)), // THEME
+
+              // 4. List of Validated Words
+              Expanded(
+                child: ListView.builder(
+                  padding: EdgeInsets.all(16),
+                  itemCount: _validSequence.length,
+                  reverse: true, // Show newest items at bottom
+                  itemBuilder: (context, index) {
+                    int realIndex = _validSequence.length - 1 - index;
+                    String word = _validSequence[realIndex];
+                    bool wasLetter = _startWithLetter ? (realIndex % 2 == 0) : (realIndex % 2 != 0);
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      child: Row(
+                        mainAxisAlignment: wasLetter ? MainAxisAlignment.start : MainAxisAlignment.end,
+                        children: [
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              // THEME: SkyBlue for Letters, MintGreen for Categories
+                              color: wasLetter ? AppColors.skyBlue : AppColors.mintGreen,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))]
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  word.toUpperCase(), 
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.deepSlate) // THEME
+                                ),
+                                SizedBox(width: 8),
+                                Icon(Icons.check_circle, size: 16, color: AppColors.deepSlate.withOpacity(0.6)), // THEME
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -327,15 +373,16 @@ class _FluencyTestScreenState extends State<FluencyTestScreen> {
       duration: Duration(milliseconds: 300),
       padding: EdgeInsets.symmetric(vertical: 20, horizontal: 10),
       decoration: BoxDecoration(
-        color: isActive ? Colors.blue : Colors.white,
+        color: AppColors.cream, // THEME: Always cream
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: isActive ? Colors.blue : Colors.grey.shade300, 
+          // THEME: Border is DeepSlate if active, Transparent if not
+          color: isActive ? AppColors.deepSlate : Colors.transparent, 
           width: isActive ? 3 : 1
         ),
         boxShadow: isActive 
-            ? [BoxShadow(color: Colors.blue.withOpacity(0.4), blurRadius: 10, offset: Offset(0, 4))] 
-            : [],
+            ? [BoxShadow(color: AppColors.deepSlate.withOpacity(0.2), blurRadius: 10, offset: Offset(0, 4))] 
+            : [BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 2))], // THEME
       ),
       child: Column(
         children: [
@@ -344,7 +391,8 @@ class _FluencyTestScreenState extends State<FluencyTestScreen> {
             style: TextStyle(
               fontSize: 12, 
               fontWeight: FontWeight.bold, 
-              color: isActive ? Colors.white70 : Colors.grey
+              // THEME: Text is DeepSlate (faded if inactive)
+              color: isActive ? AppColors.deepSlate : AppColors.deepSlate.withOpacity(0.4)
             )
           ),
           SizedBox(height: 5),
@@ -353,7 +401,8 @@ class _FluencyTestScreenState extends State<FluencyTestScreen> {
             style: TextStyle(
               fontSize: 28, 
               fontWeight: FontWeight.bold, 
-              color: isActive ? Colors.white : Colors.black87
+              // THEME: Text is DeepSlate (faded if inactive)
+              color: isActive ? AppColors.deepSlate : AppColors.deepSlate.withOpacity(0.4)
             )
           ),
         ],
