@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
-import '../services/daily_tracker.dart'; // <--- Added Logic Import
+import '../services/daily_tracker.dart'; 
 
-// Import your game files here
 import 'processing_speed_test.dart';
 import 'fluency_test.dart';
 import 'memory_test.dart';
@@ -13,7 +12,6 @@ class GamesMenuScreen extends StatefulWidget {
 }
 
 class _GamesMenuScreenState extends State<GamesMenuScreen> {
-  // State variables to track completion
   bool _fluencyDone = false;
   bool _speedDone = false;
   bool _attentionDone = false;
@@ -25,7 +23,6 @@ class _GamesMenuScreenState extends State<GamesMenuScreen> {
     _checkGames();
   }
 
-  // Check SharedPreferences to see what is done today
   void _checkGames() async {
     final f = await DailyTracker.isDoneToday(DailyTracker.KEY_FLUENCY);
     final s = await DailyTracker.isDoneToday(DailyTracker.KEY_SPEED);
@@ -42,10 +39,9 @@ class _GamesMenuScreenState extends State<GamesMenuScreen> {
     }
   }
 
-  // Helper to go to game and refresh status upon return
   void _goToGame(Widget page) async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
-    _checkGames(); // Refresh the grey-out status instantly when back
+    _checkGames(); 
   }
 
   @override
@@ -64,9 +60,7 @@ class _GamesMenuScreenState extends State<GamesMenuScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: AppColors.mainGradient,
-        ),
+        decoration: BoxDecoration(gradient: AppColors.mainGradient),
         child: SafeArea(
           child: SingleChildScrollView(
             child: Padding(
@@ -78,45 +72,10 @@ class _GamesMenuScreenState extends State<GamesMenuScreen> {
                   
                   _buildSectionHeader("JOCS DISPONIBLES"),
 
-                  // 1. Processing Speed
-                  _buildNavButton(
-                    context, 
-                    "Velocitat", 
-                    "Joc de reflexos",
-                    Icons.speed, 
-                    _speedDone, // Pass status
-                    () => _goToGame(ProcessingSpeedTest())
-                  ),
-                  
-                  // 2. Fluency
-                  _buildNavButton(
-                    context, 
-                    "Fluència Verbal", 
-                    "Alternança de paraules",
-                    Icons.record_voice_over, 
-                    _fluencyDone, // Pass status
-                    () => _goToGame(FluencyTestScreen())
-                  ),
-                  
-                  // 3. Attention
-                  _buildNavButton(
-                    context, 
-                    "Atenció", 
-                    "Repetició de nombres",
-                    Icons.pin, 
-                    _attentionDone, // Pass status
-                    () => _goToGame(DigitSpanTest(isReverse: false))
-                  ),
-                  
-                  // 4. Working Memory
-                  _buildNavButton(
-                    context, 
-                    "Memòria de Treball", 
-                    "Nombres inversos",
-                    Icons.psychology, 
-                    _memoryDone, // Pass status
-                    () => _goToGame(DigitSpanTest(isReverse: true))
-                  ),
+                  _buildNavButton(context, "Velocitat", "Joc de reflexos", Icons.speed, _speedDone, () => _goToGame(ProcessingSpeedTest())),
+                  _buildNavButton(context, "Fluència Verbal", "Alternança de paraules", Icons.record_voice_over, _fluencyDone, () => _goToGame(FluencyTestScreen())),
+                  _buildNavButton(context, "Atenció", "Repetició de nombres", Icons.pin, _attentionDone, () => _goToGame(DigitSpanTest(isReverse: false))),
+                  _buildNavButton(context, "Memòria de Treball", "Nombres inversos", Icons.psychology, _memoryDone, () => _goToGame(DigitSpanTest(isReverse: true))),
                   
                   SizedBox(height: 20),
                 ],
@@ -127,8 +86,6 @@ class _GamesMenuScreenState extends State<GamesMenuScreen> {
       ),
     );
   }
-
-  // --- HELPER WIDGETS (Modified slightly for Logic, but kept Style) ---
 
   Widget _buildSectionHeader(String title) {
     return Padding(
@@ -144,38 +101,40 @@ class _GamesMenuScreenState extends State<GamesMenuScreen> {
   }
 
   Widget _buildNavButton(BuildContext ctx, String title, String subtitle, IconData icon, bool isDone, VoidCallback onTap) {
+    // DARKER SHADING FOR COMPLETED STATE (Matching Home Screen)
+    final bgColor = isDone ? const Color(0xFFBBF7D0) : AppColors.cream; 
+    final textColor = isDone ? const Color(0xFF14532D) : AppColors.deepSlate; 
+    final iconBgColor = isDone ? const Color(0xFF86EFAC) : AppColors.skyBlue.withOpacity(0.2);
+    final iconColor = isDone ? const Color(0xFF14532D) : AppColors.deepSlate;
+
     return Container(
       margin: EdgeInsets.only(bottom: 15),
       decoration: BoxDecoration(
-        // Remove shadow if done to look "flat" and disabled
-        boxShadow: isDone ? [] : [BoxShadow(color: AppColors.deepSlate.withOpacity(0.1), blurRadius: 10, offset: Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.deepSlate.withOpacity(isDone ? 0.05 : 0.1), 
+            blurRadius: 10, 
+            offset: Offset(0, 4)
+          )
+        ],
       ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          // Grey if done, Cream if active
-          backgroundColor: isDone ? Colors.grey[200] : AppColors.cream,
-          foregroundColor: isDone ? Colors.grey : AppColors.deepSlate,
+          backgroundColor: bgColor,
+          foregroundColor: textColor,
+          disabledBackgroundColor: bgColor,
+          disabledForegroundColor: textColor,
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           elevation: 0,
         ),
-        // Disable click if done
         onPressed: isDone ? null : onTap,
         child: Row(
           children: [
             Container(
               padding: EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                // Grey box if done, SkyBlue if active
-                color: isDone ? Colors.grey[300] : AppColors.skyBlue.withOpacity(0.2), 
-                borderRadius: BorderRadius.circular(10)
-              ),
-              // Show Checkmark if done
-              child: Icon(
-                isDone ? Icons.check : icon, 
-                color: isDone ? Colors.grey[600] : AppColors.deepSlate, 
-                size: 24
-              ),
+              decoration: BoxDecoration(color: iconBgColor, borderRadius: BorderRadius.circular(10)),
+              child: Icon(isDone ? Icons.check : icon, color: iconColor, size: 24),
             ),
             SizedBox(width: 15),
             Expanded(
@@ -184,18 +143,13 @@ class _GamesMenuScreenState extends State<GamesMenuScreen> {
                 children: [
                   Text(
                     title, 
-                    style: TextStyle(
-                      fontSize: 17, 
-                      fontWeight: FontWeight.bold, 
-                      color: isDone ? Colors.grey : AppColors.deepSlate,
-                      decoration: isDone ? TextDecoration.lineThrough : null // Strikethrough text
-                    )
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)
                   ),
                   Text(
-                    isDone ? "Completat per avui" : subtitle, // Change subtitle feedback
+                    isDone ? "Completat" : subtitle, 
                     style: TextStyle(
                       fontSize: 13, 
-                      color: isDone ? Colors.grey : AppColors.deepSlate.withOpacity(0.6)
+                      color: textColor.withOpacity(0.9)
                     )
                   ),
                 ],
