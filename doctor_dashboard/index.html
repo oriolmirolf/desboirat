@@ -3,26 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Desboira't PRO - Portal Mèdic</title>
+    <title>Desboira't PRO - Dashboard</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        body { background-color: #f3f4f6; font-family: 'Inter', sans-serif; }
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        body { background-color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .fade-in { animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .active-tab { border-bottom: 2px solid #2563eb; color: #2563eb; font-weight: 600; }
+        .inactive-tab { border-bottom: 2px solid transparent; color: #64748b; }
+        .inactive-tab:hover { color: #334155; }
+
+        /* PRINT STYLES (For the QR PDF) */
+        @media print {
+            aside, header, #login-screen, #nav-qr-small, #btn-print { display: none !important; }
+            #dashboard-screen { height: auto; overflow: visible; }
+            main { margin: 0; padding: 0; background: white; }
+            #qr-view-content { display: flex !important; align-items: center; justify-content: center; height: 100vh; }
+            .no-print { display: none; }
+        }
     </style>
 </head>
-<body class="text-gray-800">
+<body class="text-slate-800 antialiased h-screen overflow-hidden flex flex-col">
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, query, where, onSnapshot, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // --- 🔴 YOUR REAL CONFIGURATION 🔴 ---
+        // --- 🔴 CONFIGURATION 🔴 ---
         const firebaseConfig = {
             apiKey: "AIzaSyDPLgw_-KggBhUAVwjpZnA9f3zWgZ-Qfg4",
             authDomain: "desboirat.firebaseapp.com",
@@ -32,279 +52,430 @@
             appId: "1:207065876556:web:f7e50605d0b0711d3d4ce9",
             measurementId: "G-H4NPWJLEB4"
         };
-        // --- 🔴 END CONFIG 🔴 ---
 
-        // Initialize
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const googleProvider = new GoogleAuthProvider();
 
-        // STATE
-        let currentUser = null;
+        // GLOBAL STATE
+        let allPatientResults = []; 
+        let currentTab = 'objective'; 
+        let objChartInstance = null;
+        let subjChartInstance = null;
+        let doctorUid = "";
 
-        // --- AUTH HANDLERS ---
+        // --- AUTH ---
         window.login = async () => {
             const email = document.getElementById('email').value;
             const pass = document.getElementById('password').value;
-            if(!email || !pass) return alert("Si us plau, omple tots els camps.");
-            try { await signInWithEmailAndPassword(auth, email, pass); } 
-            catch (e) { alert("Error: " + e.message); }
+            try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) { alert(e.message); }
         };
-
         window.loginGoogle = async () => {
-            try { await signInWithPopup(auth, googleProvider); } 
-            catch (e) { console.error(e); alert("Error Google: " + e.message); }
+            try { await signInWithPopup(auth, googleProvider); } catch (e) { alert(e.message); }
         };
-
         window.register = async () => {
             const email = document.getElementById('email').value;
             const pass = document.getElementById('password').value;
-            if(!email.includes('@')) return alert("Correu invàlid.");
-            if(pass.length < 6) return alert("La contrasenya ha de tenir 6 caràcters.");
-            try {
-                await createUserWithEmailAndPassword(auth, email, pass);
-                alert("Compte creat! Ara estàs connectat.");
-            } catch (e) { console.error(e); alert("Error al registrar: " + e.code); }
+            try { await createUserWithEmailAndPassword(auth, email, pass); } catch (e) { alert(e.message); }
         };
-
         window.logout = () => signOut(auth);
 
         onAuthStateChanged(auth, (user) => {
-            currentUser = user;
-            const loginScreen = document.getElementById('login-screen');
-            const dashboardScreen = document.getElementById('dashboard-screen');
-
             if (user) {
-                loginScreen.classList.add('hidden');
-                dashboardScreen.classList.remove('hidden');
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('dashboard-screen').classList.remove('hidden');
                 document.getElementById('doctor-email').innerText = user.email;
+                doctorUid = user.uid;
+                
+                // Init Views
                 generateQR(user.uid);
                 loadPatients(user.uid);
+                showMainView(); // Default to patients view
             } else {
-                loginScreen.classList.remove('hidden');
-                dashboardScreen.classList.add('hidden');
+                document.getElementById('login-screen').classList.remove('hidden');
+                document.getElementById('dashboard-screen').classList.add('hidden');
             }
         });
 
-        // --- APP LOGIC ---
+        // --- NAVIGATION LOGIC ---
+        window.showMainView = () => {
+            document.getElementById('view-main').classList.remove('hidden');
+            document.getElementById('view-qr').classList.add('hidden');
+            
+            // Sidebar Styling
+            document.getElementById('nav-patients').className = "flex items-center gap-3 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium cursor-pointer transition";
+            document.getElementById('nav-qr').className = "flex items-center gap-3 px-3 py-2 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-lg font-medium cursor-pointer transition";
+        };
 
+        window.showQRView = () => {
+            document.getElementById('view-main').classList.add('hidden');
+            document.getElementById('view-qr').classList.remove('hidden');
+            
+            // Sidebar Styling
+            document.getElementById('nav-patients').className = "flex items-center gap-3 px-3 py-2 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-lg font-medium cursor-pointer transition";
+            document.getElementById('nav-qr').className = "flex items-center gap-3 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium cursor-pointer transition";
+        };
+
+        window.printQR = () => {
+            window.print();
+        };
+
+        // --- APP LOGIC ---
         function generateQR(uid) {
-            const url = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${uid}`;
-            document.getElementById('qr-img').src = url;
-            document.getElementById('doctor-uid').innerText = uid;
+            const url = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${uid}`;
+            // Small Sidebar QR
+            // document.getElementById('qr-img-small').src = url;
+            // Big Full Screen QR
+            document.getElementById('qr-img-big').src = url;
+            document.getElementById('doctor-uid-big').innerText = uid;
         }
 
         function loadPatients(doctorId) {
             const q = query(collection(db, "users"), where("doctorId", "==", doctorId));
-            
             onSnapshot(q, (snapshot) => {
                 const list = document.getElementById('patient-list');
                 list.innerHTML = "";
-                let total = 0;
-                
-                if (snapshot.empty) {
-                    list.innerHTML = `<div class="p-8 text-center text-gray-400">Cap pacient vinculat encara.</div>`;
-                    return;
-                }
+                document.getElementById('total-patients').innerText = snapshot.size;
 
                 snapshot.forEach(doc => {
-                    total++;
                     const data = doc.data();
                     const el = document.createElement('div');
-                    el.className = "p-4 border-b hover:bg-blue-50 cursor-pointer transition flex justify-between items-center bg-white";
+                    el.className = "group p-4 border-b border-slate-100 hover:bg-blue-50 cursor-pointer transition flex items-center gap-3";
                     el.onclick = () => loadPatientDetails(doc.id, data.email);
                     el.innerHTML = `
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
-                                ${data.email ? data.email[0].toUpperCase() : '?'}
-                            </div>
-                            <div>
-                                <p class="font-bold text-gray-700">${data.email || 'Anònim'}</p>
-                                <p class="text-xs text-gray-400">ID: ${doc.id.slice(0,6)}...</p>
-                            </div>
+                        <div class="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold group-hover:bg-blue-200 group-hover:text-blue-700 transition">
+                            ${data.email ? data.email[0].toUpperCase() : '?'}
                         </div>
-                        <i class="ph ph-caret-right text-gray-400"></i>
+                        <div class="flex-1">
+                            <p class="font-semibold text-slate-700 group-hover:text-blue-900">${data.email || 'Sense Nom'}</p>
+                            <p class="text-xs text-slate-400 font-mono">ID: ${doc.id.slice(0,6)}...</p>
+                        </div>
+                        <i class="ph ph-caret-right text-slate-300 group-hover:text-blue-500"></i>
                     `;
                     list.appendChild(el);
                 });
-                document.getElementById('total-patients').innerText = total;
             });
         }
 
-        // --- UPDATED: HANDLES ALL GAME TYPES ---
         window.loadPatientDetails = async (patientId, email) => {
             document.getElementById('selected-patient-name').innerText = email || "Pacient";
             document.getElementById('empty-state').classList.add('hidden');
             document.getElementById('patient-stats').classList.remove('hidden');
             
-            const resultsRef = collection(db, `users/${patientId}/results`);
-            const q = query(resultsRef, orderBy("timestamp", "desc")); // Newest first
+            const q = query(collection(db, `users/${patientId}/results`), orderBy("timestamp", "desc"));
             const snapshot = await getDocs(q);
             
-            const historyList = document.getElementById('history-list');
-            historyList.innerHTML = ""; // Clear old list
+            allPatientResults = [];
+            snapshot.forEach(doc => allPatientResults.push(doc.data()));
 
-            // Arrays for the chart (Fluency only for visual simplicity)
-            const fluencyPoints = [];
-            const fluencyLabels = [];
+            switchTab('objective');
+        }
 
-            snapshot.forEach(doc => {
-                const d = doc.data();
-                const dateRaw = d.timestamp ? new Date(d.timestamp.seconds * 1000) : new Date();
-                const dateStr = dateRaw.toLocaleString();
+        window.switchTab = (tabName) => {
+            currentTab = tabName;
+            const btnObj = document.getElementById('btn-objective');
+            const btnSub = document.getElementById('btn-subjective');
+            
+            if(tabName === 'objective') {
+                btnObj.className = "pb-3 px-2 active-tab transition";
+                btnSub.className = "pb-3 px-2 inactive-tab transition";
+            } else {
+                btnObj.className = "pb-3 px-2 inactive-tab transition";
+                btnSub.className = "pb-3 px-2 active-tab transition";
+            }
+            renderDashboard();
+        }
+
+        function renderDashboard() {
+            const container = document.getElementById('dashboard-content');
+            container.innerHTML = ""; 
+            if (currentTab === 'objective') renderObjectiveView(container);
+            else renderSubjectiveView(container);
+        }
+
+        // --- RENDERERS ---
+
+        function renderObjectiveView(container) {
+            const objectiveData = allPatientResults.filter(d => d.testName !== 'qüestionari_subjectiu');
+            
+            // 1. CARDS
+            const topStats = document.createElement('div');
+            topStats.className = "grid grid-cols-4 gap-4 mb-6 fade-in";
+            
+            let maxFluency = 0, maxAttention = 0, maxWorkingMem = 0;
+            let speedCount = 0, speedSum = 0;
+
+            objectiveData.forEach(d => {
+                if(d.testName === 'fluencia_verbal' && d.score > maxFluency) maxFluency = d.score;
+                if(d.testName === 'atencio' && d.score > maxAttention) maxAttention = d.score;
+                if(d.testName === 'memoria_treball' && d.score > maxWorkingMem) maxWorkingMem = d.score;
+                if(d.testName === 'velocitat_processament') { speedSum += d.score_time_seconds; speedCount++; }
+            });
+            const avgSpeed = speedCount > 0 ? (speedSum / speedCount).toFixed(1) : '-';
+
+            topStats.innerHTML = `
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                    <div class="flex items-center gap-2 mb-1 text-blue-600 font-semibold text-xs uppercase"><i class="ph ph-microphone"></i> Fluència</div>
+                    <div class="text-2xl font-bold text-slate-800">${maxFluency} <span class="text-xs font-normal text-slate-500">paraules</span></div>
+                </div>
+                <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                    <div class="flex items-center gap-2 mb-1 text-emerald-600 font-semibold text-xs uppercase"><i class="ph ph-eye"></i> Atenció</div>
+                    <div class="text-2xl font-bold text-slate-800">${maxAttention} <span class="text-xs font-normal text-slate-500">dígits</span></div>
+                </div>
+                <div class="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                    <div class="flex items-center gap-2 mb-1 text-purple-600 font-semibold text-xs uppercase"><i class="ph ph-brain"></i> M. Treball</div>
+                    <div class="text-2xl font-bold text-slate-800">${maxWorkingMem} <span class="text-xs font-normal text-slate-500">dígits</span></div>
+                </div>
+                <div class="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                    <div class="flex items-center gap-2 mb-1 text-orange-600 font-semibold text-xs uppercase"><i class="ph ph-lightning"></i> Velocitat</div>
+                    <div class="text-2xl font-bold text-slate-800">${avgSpeed} <span class="text-xs font-normal text-slate-500">s</span></div>
+                </div>
+            `;
+            container.appendChild(topStats);
+
+            // 2. CHART
+            const chartContainer = document.createElement('div');
+            chartContainer.className = "bg-white p-4 rounded-xl border border-slate-200 mb-6 shadow-sm fade-in h-80 relative";
+            chartContainer.innerHTML = '<canvas id="objChart"></canvas>';
+            container.appendChild(chartContainer);
+
+            setTimeout(() => {
+                if (objChartInstance) objChartInstance.destroy();
+                const ctx = document.getElementById('objChart').getContext('2d');
                 
-                let icon = "ph-question";
-                let color = "bg-gray-100 text-gray-600";
-                let details = "";
-                let title = "Test desconegut";
+                const revData = [...objectiveData].reverse();
+                const labels = revData.map(d => new Date(d.timestamp.seconds * 1000).toLocaleDateString());
+                
+                // DATASETS (ALL SOLID LINES, NO DASHES)
+                const fluencyPoints = revData.map(d => d.testName === 'fluencia_verbal' ? d.score : null);
+                const attentionPoints = revData.map(d => d.testName === 'atencio' ? d.score : null);
+                const workingMemPoints = revData.map(d => d.testName === 'memoria_treball' ? d.score : null);
+                const speedPoints = revData.map(d => d.testName === 'velocitat_processament' ? d.score_time_seconds : null);
 
-                // --- LOGIC TO HANDLE EACH GAME TYPE ---
-                if (d.testName === 'fluencia_verbal') {
-                    title = "Fluència Verbal";
-                    icon = "ph-microphone";
-                    color = "bg-blue-100 text-blue-600";
-                    details = `<span class="font-bold text-blue-700">${d.score} paraules</span> (Lletra/Cat: ${d.target_letter || d.target_category || '?'})`;
+                objChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Fluència', data: fluencyPoints, borderColor: '#2563eb', backgroundColor: '#2563eb', spanGaps: true, tension: 0.3, pointRadius: 4 }, // BLUE
+                            { label: 'Atenció (Simple)', data: attentionPoints, borderColor: '#10b981', backgroundColor: '#10b981', spanGaps: true, tension: 0.3, pointRadius: 4 }, // EMERALD
+                            { label: 'M. Treball (Invers)', data: workingMemPoints, borderColor: '#9333ea', backgroundColor: '#9333ea', spanGaps: true, tension: 0.3, pointRadius: 4 }, // PURPLE
+                            { label: 'Velocitat (s)', data: speedPoints, borderColor: '#f97316', backgroundColor: '#f97316', spanGaps: true, tension: 0.3, pointRadius: 4 } // ORANGE (Now Solid!)
+                        ]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } }
+                });
+            }, 50);
+
+            renderHistoryList(container, objectiveData);
+        }
+
+        function renderSubjectiveView(container) {
+            const subjectiveData = allPatientResults.filter(d => d.testName === 'qüestionari_subjectiu');
+            
+            if(subjectiveData.length === 0) {
+                container.innerHTML = `<div class="p-10 text-center text-slate-400 fade-in">El pacient no ha realitzat cap autoavaluació.</div>`;
+                return;
+            }
+
+            const latest = subjectiveData[0]; 
+            const scores = [0,0,0,0,0];
+            const domains = ["Atenció", "Velocitat", "Fluència", "Memòria", "Executiu"];
+            
+            if(latest.answers_map) {
+                Object.keys(latest.answers_map).forEach(key => {
+                    let index = parseInt(key);
+                    if(index >= 0 && index < 5) scores[index] = latest.answers_map[key];
+                });
+            }
+
+            const chartRow = document.createElement('div');
+            chartRow.className = "grid grid-cols-2 gap-6 mb-6 fade-in";
+            
+            const chartCard = document.createElement('div');
+            chartCard.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm h-80 relative";
+            chartCard.innerHTML = '<canvas id="subjChart"></canvas>';
+            
+            const textCard = document.createElement('div');
+            textCard.className = "bg-emerald-50 p-6 rounded-xl border border-emerald-100 flex flex-col justify-center";
+            textCard.innerHTML = `
+                <h3 class="text-emerald-800 font-bold text-lg mb-2"><i class="ph ph-check-circle"></i> Últim Check-in</h3>
+                <p class="text-emerald-700 text-sm mb-4">Realitzat el: ${new Date(latest.timestamp.seconds*1000).toLocaleDateString()}</p>
+                <div class="space-y-2">
+                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Atenció:</span> <span class="font-bold">${scores[0]}/4</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Memòria:</span> <span class="font-bold">${scores[3]}/4</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Brain Fog:</span> <span class="font-bold">${scores[4]}/4</span></div>
+                </div>
+            `;
+
+            chartRow.appendChild(chartCard);
+            chartRow.appendChild(textCard);
+            container.appendChild(chartRow);
+
+            setTimeout(() => {
+                if (subjChartInstance) subjChartInstance.destroy();
+                const ctx = document.getElementById('subjChart').getContext('2d');
+                subjChartInstance = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: domains,
+                        datasets: [{
+                            label: 'Símptomes (0=Bé, 4=Malament)',
+                            data: scores,
+                            fill: true,
+                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                            borderColor: '#10b981',
+                            pointBackgroundColor: '#10b981',
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { r: { suggestedMin: 0, suggestedMax: 4 } } }
+                });
+            }, 50);
+
+            renderHistoryList(container, subjectiveData);
+        }
+
+        function renderHistoryList(container, data) {
+            const listTitle = document.createElement('h4');
+            listTitle.className = "font-bold text-slate-700 mb-3 text-sm uppercase tracking-wide";
+            listTitle.innerText = "Historial Detallat";
+            container.appendChild(listTitle);
+
+            const listContainer = document.createElement('div');
+            listContainer.className = "bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm fade-in";
+
+            if(data.length === 0) {
+                listContainer.innerHTML = `<div class="p-4 text-center text-sm text-slate-400">Cap registre trobat.</div>`;
+            } else {
+                data.forEach(d => {
+                    const row = document.createElement('div');
+                    row.className = "flex items-center justify-between p-4 border-b border-slate-100 hover:bg-slate-50 transition last:border-0";
                     
-                    // Add to Chart (reverse order later for graph)
-                    fluencyPoints.unshift(d.score);
-                    fluencyLabels.unshift(dateRaw.toLocaleDateString());
-                } 
-                else if (d.testName === 'memoria_treball' || d.testName === 'atencio') {
-                    title = d.testName === 'memoria_treball' ? "Memòria de Treball" : "Atenció";
-                    icon = "ph-brain";
-                    color = "bg-purple-100 text-purple-600";
-                    details = `<span class="font-bold text-purple-700">${d.score} dígits</span> (${d.test_type})`;
-                }
-                else if (d.testName === 'velocitat_processament') {
-                    title = "Velocitat";
-                    icon = "ph-lightning";
-                    color = "bg-yellow-100 text-yellow-600";
-                    details = `<span class="font-bold text-yellow-700">${d.score_time_seconds.toFixed(2)} segons</span>`;
-                }
-                else if (d.testName === 'qüestionari_subjectiu') {
-                    title = "Autoavaluació";
-                    icon = "ph-clipboard-text";
-                    color = "bg-green-100 text-green-600";
-                    details = `<span class="font-bold text-green-700">Completat</span>`;
-                }
+                    let icon, color, title, val;
+                    const date = new Date(d.timestamp.seconds * 1000).toLocaleDateString();
 
-                // Add Row to History Table
-                const row = document.createElement('tr');
-                row.className = "border-b hover:bg-gray-50";
-                row.innerHTML = `
-                    <td class="p-3">
+                    if(d.testName === 'fluencia_verbal') { icon="microphone"; color="text-blue-500 bg-blue-100"; title="Fluència Verbal"; val=`${d.score} paraules`; }
+                    else if(d.testName === 'memoria_treball') { icon="brain"; color="text-purple-500 bg-purple-100"; title="Memòria Treball (Invers)"; val=`${d.score} dígits`; }
+                    else if(d.testName === 'atencio') { icon="eye"; color="text-emerald-500 bg-emerald-100"; title="Atenció (Simple)"; val=`${d.score} dígits`; }
+                    else if(d.testName === 'velocitat_processament') { icon="lightning"; color="text-orange-500 bg-orange-100"; title="Velocitat"; val=`${d.score_time_seconds.toFixed(2)}s`; }
+                    else { icon="clipboard-text"; color="text-slate-500 bg-slate-100"; title="Autoavaluació"; val="Completat"; }
+
+                    row.innerHTML = `
                         <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-full ${color} flex items-center justify-center">
-                                <i class="ph ${icon}"></i>
+                            <div class="w-8 h-8 rounded-lg ${color} flex items-center justify-center"><i class="ph ph-${icon}"></i></div>
+                            <div>
+                                <p class="text-sm font-semibold text-slate-700">${title}</p>
+                                <p class="text-xs text-slate-400">${date}</p>
                             </div>
-                            <span class="font-medium">${title}</span>
                         </div>
-                    </td>
-                    <td class="p-3 text-right">${details}</td>
-                    <td class="p-3 text-right text-xs text-gray-500">${dateStr}</td>
-                `;
-                historyList.appendChild(row);
-            });
-
-            // Update Chart (Fluency)
-            if(window.myChart) window.myChart.destroy();
-            const ctx = document.getElementById('mainChart').getContext('2d');
-            window.myChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: fluencyLabels,
-                    datasets: [{
-                        label: 'Evolució Fluència Verbal',
-                        data: fluencyPoints,
-                        borderColor: '#2563eb',
-                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
+                        <div class="font-mono text-sm font-bold text-slate-600">${val}</div>
+                    `;
+                    listContainer.appendChild(row);
+                });
+            }
+            container.appendChild(listContainer);
         }
     </script>
 
-    <div id="login-screen" class="min-h-screen flex items-center justify-center bg-gray-100 fade-in">
-        <div class="bg-white p-8 rounded-2xl shadow-xl w-96">
-            <div class="text-center mb-6">
-                <h1 class="text-3xl font-bold text-blue-600">Desboira't PRO</h1>
-                <p class="text-gray-400">Portal del Metge</p>
+    <div id="login-screen" class="flex-1 flex items-center justify-center bg-slate-50 fade-in p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm border border-slate-100">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-3xl mx-auto mb-4 shadow-lg shadow-blue-200"><i class="ph ph-brain"></i></div>
+                <h1 class="text-2xl font-bold text-slate-800">Desboira't PRO</h1>
+                <p class="text-slate-400 text-sm">Accés per a professionals</p>
             </div>
-            <input type="email" id="email" placeholder="Correu electrònic" class="w-full p-3 mb-3 border rounded-lg bg-gray-50">
-            <input type="password" id="password" placeholder="Contrasenya" class="w-full p-3 mb-6 border rounded-lg bg-gray-50">
-            <button onclick="login()" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 transition mb-3">Entrar</button>
-            <button onclick="loginGoogle()" class="w-full border border-gray-300 text-gray-700 p-3 rounded-lg font-medium hover:bg-gray-50 transition flex items-center justify-center gap-2 mb-4">
+            <div class="space-y-3">
+                <input id="email" type="email" placeholder="nom@hospital.cat" class="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm">
+                <input id="password" type="password" placeholder="••••••••" class="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm">
+            </div>
+            <button onclick="login()" class="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-md shadow-blue-100">Iniciar Sessió</button>
+            <button onclick="loginGoogle()" class="w-full mt-3 bg-white border border-slate-200 text-slate-600 font-semibold py-3 rounded-xl hover:bg-slate-50 flex items-center justify-center gap-2">
                 <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5"> Entrar amb Google
             </button>
-            <div class="text-center"><button onclick="register()" class="text-sm text-blue-500 hover:underline">Crear compte nou</button></div>
+            <div class="mt-6 text-center"><button onclick="register()" class="text-xs text-blue-500 font-semibold hover:underline">Registrar nou compte</button></div>
         </div>
     </div>
 
-    <div id="dashboard-screen" class="hidden min-h-screen flex bg-gray-50 fade-in">
-        <aside class="w-64 bg-white border-r flex flex-col justify-between fixed h-full z-10">
+    <div id="dashboard-screen" class="hidden flex-1 flex h-screen overflow-hidden">
+        
+        <aside class="w-72 bg-white border-r border-slate-200 flex flex-col z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
             <div class="p-6">
-                <h2 class="text-2xl font-bold text-blue-600 mb-8">Desboira't</h2>
-                <nav class="space-y-2">
-                    <a href="#" class="flex items-center gap-3 p-3 bg-blue-50 text-blue-600 rounded-lg font-medium"><i class="ph ph-users-three text-xl"></i> Pacients</a>
+                <div class="flex items-center gap-3 text-blue-700 font-bold text-xl mb-8">
+                    <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center"><i class="ph ph-brain"></i></div> Desboira't
+                </div>
+                <nav class="space-y-1">
+                    <div id="nav-patients" onclick="showMainView()" class="flex items-center gap-3 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium cursor-pointer transition">
+                        <i class="ph ph-users-three text-lg"></i> Pacients
+                    </div>
+                    <div id="nav-qr" onclick="showQRView()" class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-lg font-medium cursor-pointer transition">
+                        <i class="ph ph-qr-code text-lg"></i> Vincular / QR
+                    </div>
                 </nav>
             </div>
-            <div class="p-4 border-t bg-gray-50">
-                <p class="text-xs font-bold text-gray-500 uppercase mb-1">Doctor</p>
-                <p class="text-sm font-bold truncate" id="doctor-email">...</p>
-                <button onclick="logout()" class="text-red-500 text-sm mt-2 hover:underline">Tancar Sessió</button>
+            
+            <div class="mt-auto p-4 border-t border-slate-100 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shadow-md">Dr</div>
+                <div class="flex-1 overflow-hidden">
+                    <p class="text-sm font-bold text-slate-700 truncate" id="doctor-email">...</p>
+                    <button onclick="logout()" class="text-xs text-red-500 hover:underline">Tancar Sessió</button>
+                </div>
             </div>
         </aside>
 
-        <main class="ml-64 flex-1 p-8">
-            <div class="grid grid-cols-12 gap-6 h-full">
-                <div class="col-span-4 flex flex-col gap-6">
-                    <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg text-center">
-                        <p class="text-sm opacity-80 mb-4">Escaneja per vincular pacient</p>
-                        <div class="bg-white p-3 rounded-xl inline-block shadow-inner">
-                            <img id="qr-img" src="" class="w-32 h-32">
-                        </div>
-                        <div class="mt-4 bg-white/20 p-2 rounded text-xs font-mono select-all cursor-pointer" id="doctor-uid">...</div>
-                    </div>
-                    <div class="bg-white rounded-2xl shadow-sm border flex-1 flex flex-col overflow-hidden h-[500px]">
-                        <div class="p-4 border-b font-bold text-gray-700 flex justify-between">
-                            <span>Pacients</span>
-                            <span class="bg-blue-100 text-blue-700 px-2 rounded-full text-xs flex items-center" id="total-patients">0</span>
-                        </div>
-                        <div id="patient-list" class="overflow-y-auto flex-1"></div>
-                    </div>
+        <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
+            <header class="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center shadow-sm z-10">
+                <div><h2 class="text-xl font-bold text-slate-800">Panell de Control</h2></div>
+                <div class="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full border border-slate-200">
+                    <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <span class="text-xs font-bold text-slate-600"><span id="total-patients">0</span> Pacients Actius</span>
                 </div>
-
-                <div class="col-span-8">
-                    <div class="bg-white rounded-2xl shadow-sm border p-8 h-full relative flex flex-col">
-                        <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-gray-300">
-                            <i class="ph ph-chart-line-up text-6xl mb-4"></i>
-                            <p>Selecciona un pacient per veure dades</p>
-                        </div>
-
-                        <div id="patient-stats" class="hidden h-full flex flex-col">
-                            <h2 class="text-2xl font-bold text-gray-800 mb-6" id="selected-patient-name">...</h2>
-                            
-                            <div class="h-64 bg-gray-50 rounded-xl p-4 border border-gray-100 mb-6">
-                                <canvas id="mainChart"></canvas>
-                            </div>
-
-                            <div class="flex-1 overflow-hidden flex flex-col">
-                                <h3 class="font-bold text-gray-700 mb-3">Historial d'Activitat Recent</h3>
-                                <div class="flex-1 overflow-y-auto border rounded-xl">
-                                    <table class="w-full text-sm text-left">
-                                        <tbody id="history-list">
-                                            </tbody>
-                                    </table>
-                                </div>
+            </header>
+            
+            <div id="view-main" class="flex-1 flex overflow-hidden">
+                <div class="w-80 bg-white border-r border-slate-200 flex flex-col no-print">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50/50"><input type="text" placeholder="Cercar..." class="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none"></div>
+                    <div id="patient-list" class="flex-1 overflow-y-auto"></div>
+                </div>
+                <div class="flex-1 overflow-y-auto p-8 relative">
+                    <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-slate-300">
+                        <i class="ph ph-chart-polar text-6xl mb-4 text-slate-200"></i><p class="font-medium">Selecciona un pacient</p>
+                    </div>
+                    <div id="patient-stats" class="hidden max-w-4xl mx-auto">
+                        <div class="flex justify-between items-end mb-6 border-b border-slate-200">
+                            <h2 class="text-3xl font-bold text-slate-800 pb-4" id="selected-patient-name">...</h2>
+                            <div class="flex gap-1">
+                                <button id="btn-objective" onclick="switchTab('objective')" class="pb-3 px-4 active-tab flex items-center gap-2"><i class="ph ph-chart-line-up"></i> Dades Objectives</button>
+                                <button id="btn-subjective" onclick="switchTab('subjective')" class="pb-3 px-4 inactive-tab flex items-center gap-2"><i class="ph ph-clipboard-text"></i> Autoavaluació</button>
                             </div>
                         </div>
+                        <div id="dashboard-content"></div>
                     </div>
                 </div>
             </div>
+
+            <div id="view-qr" class="hidden flex-1 flex flex-col items-center justify-center bg-white p-8">
+                <div id="qr-view-content" class="text-center max-w-lg w-full">
+                    <div class="bg-blue-600 text-white p-8 rounded-2xl shadow-xl">
+                        <h2 class="text-3xl font-bold mb-2">Vinculació de Pacients</h2>
+                        <p class="opacity-80 mb-6">Demana al pacient que escanegi aquest codi des de l'App.</p>
+                        
+                        <div class="bg-white p-4 rounded-xl inline-block shadow-lg mb-6">
+                            <img id="qr-img-big" src="" class="w-64 h-64">
+                        </div>
+                        
+                        <div class="bg-blue-800/50 p-4 rounded-xl">
+                            <p class="text-xs uppercase tracking-widest opacity-70 mb-1">Codi Manual</p>
+                            <p id="doctor-uid-big" class="text-xl font-mono font-bold tracking-wider select-all">...</p>
+                        </div>
+                    </div>
+                    
+                    <button id="btn-print" onclick="printQR()" class="mt-8 bg-slate-800 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 mx-auto hover:bg-slate-700 transition">
+                        <i class="ph ph-printer text-xl"></i> Imprimir / Guardar PDF
+                    </button>
+                </div>
+            </div>
+
         </main>
     </div>
 </body>
