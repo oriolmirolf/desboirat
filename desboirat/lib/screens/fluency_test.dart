@@ -115,7 +115,7 @@ class _FluencyTestScreenState extends State<FluencyTestScreen> {
       await _speech.listen(
         localeId: "ca-ES", // Catalan
         listenFor: Duration(seconds: 60), // Try to listen for the whole minute
-        pauseFor: Duration(seconds: 3),   // Allow 3s silence before it "cuts" (and auto-restarts)
+        pauseFor: Duration(seconds: 60),   // Allow 3s silence before it "cuts" (and auto-restarts)
         partialResults: true,             // We need this to validate words instantly
         onResult: (val) {
           if (!mounted) return;
@@ -229,9 +229,9 @@ class _FluencyTestScreenState extends State<FluencyTestScreen> {
                   ),
                 if (_isGameActive)
                   Chip(
-                    avatar: Icon(_isListening ? Icons.mic : Icons.mic_off, color: Colors.white, size: 18),
-                    label: Text(_isListening ? "Escoltant..." : "Reiniciant mic...", style: TextStyle(color: Colors.white)),
-                    backgroundColor: _isListening ? Colors.red : Colors.orange,
+                    avatar: Icon(Icons.mic, color: Colors.white, size: 18),
+                    label: Text("Escoltant..." , style: TextStyle(color: Colors.white)),
+                    backgroundColor: Colors.orange,
                   )
               ],
             ),

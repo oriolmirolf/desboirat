@@ -134,9 +134,8 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: char.isNotEmpty ? Colors.blue : Colors.grey,
-                  width: 2
-                ),
+                    color: char.isNotEmpty ? Colors.blue : Colors.grey,
+                    width: 2),
                 borderRadius: BorderRadius.circular(10),
                 color: Colors.white,
               ),
@@ -147,24 +146,33 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
             );
           }),
         ),
-        
-        // LAYER 2: The Invisible TextField that captures clicks and typing
+
+        // LAYER 2: The Invisible TextField
         Opacity(
-          opacity: 0.0, // Totally invisible
+          opacity: 0.0,
           child: SizedBox(
-            width: _digits * 60.0, // Width to cover the boxes
+            width: _digits * 60.0,
             height: 60,
             child: TextField(
               controller: _controller,
               focusNode: _inputFocusNode,
               keyboardType: TextInputType.number,
-              maxLength: _digits, // Limits input to exact number of boxes
+              maxLength: _digits, 
+              // --- MODIFIED SECTION START ---
               onChanged: (value) {
-                setState(() {}); // Rebuild to update visual boxes
+                setState(() {}); // Update visual boxes
+
+                // Check if the input is full
+                if (value.length == _digits) {
+                  // Wait 300ms so the user sees the last digit, then check
+                  Future.delayed(Duration(milliseconds: 300), () {
+                    _checkAnswer();
+                  });
+                }
               },
-              onSubmitted: (_) => _checkAnswer(),
+              // --- MODIFIED SECTION END ---
               decoration: InputDecoration(
-                counterText: "", // Hides the "0/3" character counter
+                counterText: "",
                 border: InputBorder.none,
               ),
             ),
@@ -222,7 +230,7 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
       appBar: AppBar(title: Text(widget.isReverse ? "Memòria de Treball" : "Atenció")),
       body: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          // mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(height: 20),
             // CONDITION: Only show the "How to play" box if we are at the start menu
