@@ -50,6 +50,8 @@ dependencies:
   cloud_firestore: ^5.0.1
   mobile_scanner: ^5.1.0
   google_sign_in: ^6.1.0
+  shared_preferences: ^2.2.2
+  url_launcher: ^6.2.4
 
 
 dev_dependencies:
