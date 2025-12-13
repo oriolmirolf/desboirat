@@ -32,7 +32,7 @@ dependencies:
     sdk: flutter
   # Add these for Desboira't:
   google_generative_ai: ^0.4.0  # For the chatbot
-  speech_to_text: ^6.6.0        # For the Verbal Fluency test
+  speech_to_text: ^7.3.0        # For the Verbal Fluency test
   google_fonts: ^6.1.0          # To make it look professional
 
   # The "flutter_lints" package below contains a set of recommended lints to
