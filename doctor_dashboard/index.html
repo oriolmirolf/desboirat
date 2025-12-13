@@ -25,7 +25,6 @@
         .inactive-tab { border-bottom: 2px solid transparent; color: #64748b; }
         .inactive-tab:hover { color: #334155; }
 
-        /* PRINT STYLES (For the QR PDF) */
         @media print {
             aside, header, #login-screen, #nav-qr-small, #btn-print { display: none !important; }
             #dashboard-screen { height: auto; overflow: visible; }
@@ -87,23 +86,19 @@
                 document.getElementById('dashboard-screen').classList.remove('hidden');
                 document.getElementById('doctor-email').innerText = user.email;
                 doctorUid = user.uid;
-                
-                // Init Views
                 generateQR(user.uid);
                 loadPatients(user.uid);
-                showMainView(); // Default to patients view
+                showMainView(); 
             } else {
                 document.getElementById('login-screen').classList.remove('hidden');
                 document.getElementById('dashboard-screen').classList.add('hidden');
             }
         });
 
-        // --- NAVIGATION LOGIC ---
+        // --- NAVIGATION ---
         window.showMainView = () => {
             document.getElementById('view-main').classList.remove('hidden');
             document.getElementById('view-qr').classList.add('hidden');
-            
-            // Sidebar Styling
             document.getElementById('nav-patients').className = "flex items-center gap-3 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium cursor-pointer transition";
             document.getElementById('nav-qr').className = "flex items-center gap-3 px-3 py-2 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-lg font-medium cursor-pointer transition";
         };
@@ -111,22 +106,15 @@
         window.showQRView = () => {
             document.getElementById('view-main').classList.add('hidden');
             document.getElementById('view-qr').classList.remove('hidden');
-            
-            // Sidebar Styling
             document.getElementById('nav-patients').className = "flex items-center gap-3 px-3 py-2 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-lg font-medium cursor-pointer transition";
             document.getElementById('nav-qr').className = "flex items-center gap-3 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium cursor-pointer transition";
         };
 
-        window.printQR = () => {
-            window.print();
-        };
+        window.printQR = () => window.print();
 
         // --- APP LOGIC ---
         function generateQR(uid) {
             const url = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${uid}`;
-            // Small Sidebar QR
-            // document.getElementById('qr-img-small').src = url;
-            // Big Full Screen QR
             document.getElementById('qr-img-big').src = url;
             document.getElementById('doctor-uid-big').innerText = uid;
         }
@@ -247,7 +235,6 @@
                 const revData = [...objectiveData].reverse();
                 const labels = revData.map(d => new Date(d.timestamp.seconds * 1000).toLocaleDateString());
                 
-                // DATASETS (ALL SOLID LINES, NO DASHES)
                 const fluencyPoints = revData.map(d => d.testName === 'fluencia_verbal' ? d.score : null);
                 const attentionPoints = revData.map(d => d.testName === 'atencio' ? d.score : null);
                 const workingMemPoints = revData.map(d => d.testName === 'memoria_treball' ? d.score : null);
@@ -261,7 +248,7 @@
                             { label: 'Fluència', data: fluencyPoints, borderColor: '#2563eb', backgroundColor: '#2563eb', spanGaps: true, tension: 0.3, pointRadius: 4 }, // BLUE
                             { label: 'Atenció (Simple)', data: attentionPoints, borderColor: '#10b981', backgroundColor: '#10b981', spanGaps: true, tension: 0.3, pointRadius: 4 }, // EMERALD
                             { label: 'M. Treball (Invers)', data: workingMemPoints, borderColor: '#9333ea', backgroundColor: '#9333ea', spanGaps: true, tension: 0.3, pointRadius: 4 }, // PURPLE
-                            { label: 'Velocitat (s)', data: speedPoints, borderColor: '#f97316', backgroundColor: '#f97316', spanGaps: true, tension: 0.3, pointRadius: 4 } // ORANGE (Now Solid!)
+                            { label: 'Velocitat (s)', data: speedPoints, borderColor: '#f97316', backgroundColor: '#f97316', spanGaps: true, tension: 0.3, pointRadius: 4 } // ORANGE
                         ]
                     },
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } }
@@ -271,6 +258,7 @@
             renderHistoryList(container, objectiveData);
         }
 
+        // --- UPDATED SUBJECTIVE LOGIC (7 DAY AVERAGE) ---
         function renderSubjectiveView(container) {
             const subjectiveData = allPatientResults.filter(d => d.testName === 'qüestionari_subjectiu');
             
@@ -279,17 +267,42 @@
                 return;
             }
 
-            const latest = subjectiveData[0]; 
-            const scores = [0,0,0,0,0];
-            const domains = ["Atenció", "Velocitat", "Fluència", "Memòria", "Executiu"];
-            
-            if(latest.answers_map) {
-                Object.keys(latest.answers_map).forEach(key => {
-                    let index = parseInt(key);
-                    if(index >= 0 && index < 5) scores[index] = latest.answers_map[key];
-                });
-            }
+            // 1. Calculate Average of Last 7 Days
+            const now = new Date();
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(now.getDate() - 7);
 
+            const recentDocs = subjectiveData.filter(d => new Date(d.timestamp.seconds * 1000) >= sevenDaysAgo);
+            
+            // Domain Indices: 0:Atenció, 1:Velocitat, 2:Fluència, 3:Memòria, 4:Executiu
+            const domains = ["Atenció", "Velocitat Proc.", "Fluència Verbal", "Memòria", "Funcions Exec."];
+            
+            // Map Question Index (0-7) to Domain Index (0-4)
+            // Q0(Atenció), Q1(Velocitat), Q2(Fluència), Q3(Atenció), Q4(Memòria), Q5(Memòria), Q6(Exec), Q7(Exec)
+            const questionToDomain = [0, 1, 2, 0, 3, 3, 4, 4];
+            
+            let domainSums = [0,0,0,0,0];
+            let domainCounts = [0,0,0,0,0];
+
+            recentDocs.forEach(doc => {
+                if(doc.answers_map) {
+                    Object.keys(doc.answers_map).forEach(qKey => {
+                        const qIdx = parseInt(qKey);
+                        const val = doc.answers_map[qKey];
+                        const domainIdx = questionToDomain[qIdx];
+                        
+                        if(domainIdx !== undefined) {
+                            domainSums[domainIdx] += val;
+                            domainCounts[domainIdx]++;
+                        }
+                    });
+                }
+            });
+
+            // Calculate final averages (if no data in 7 days, use 0)
+            const avgScores = domainSums.map((sum, i) => domainCounts[i] > 0 ? (sum / domainCounts[i]).toFixed(1) : 0);
+            
+            // UI
             const chartRow = document.createElement('div');
             chartRow.className = "grid grid-cols-2 gap-6 mb-6 fade-in";
             
@@ -300,12 +313,14 @@
             const textCard = document.createElement('div');
             textCard.className = "bg-emerald-50 p-6 rounded-xl border border-emerald-100 flex flex-col justify-center";
             textCard.innerHTML = `
-                <h3 class="text-emerald-800 font-bold text-lg mb-2"><i class="ph ph-check-circle"></i> Últim Check-in</h3>
-                <p class="text-emerald-700 text-sm mb-4">Realitzat el: ${new Date(latest.timestamp.seconds*1000).toLocaleDateString()}</p>
+                <h3 class="text-emerald-800 font-bold text-lg mb-2"><i class="ph ph-calendar-check"></i> Mitjana (Últims 7 dies)</h3>
+                <p class="text-emerald-700 text-sm mb-4">Registres analitzats: ${recentDocs.length}</p>
                 <div class="space-y-2">
-                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Atenció:</span> <span class="font-bold">${scores[0]}/4</span></div>
-                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Memòria:</span> <span class="font-bold">${scores[3]}/4</span></div>
-                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Brain Fog:</span> <span class="font-bold">${scores[4]}/4</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Atenció:</span> <span class="font-bold">${avgScores[0]}/4</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Velocitat:</span> <span class="font-bold">${avgScores[1]}/4</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Fluència:</span> <span class="font-bold">${avgScores[2]}/4</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Memòria:</span> <span class="font-bold">${avgScores[3]}/4</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Fun. Executives:</span> <span class="font-bold">${avgScores[4]}/4</span></div>
                 </div>
             `;
 
@@ -315,14 +330,15 @@
 
             setTimeout(() => {
                 if (subjChartInstance) subjChartInstance.destroy();
+                
                 const ctx = document.getElementById('subjChart').getContext('2d');
                 subjChartInstance = new Chart(ctx, {
                     type: 'radar',
                     data: {
                         labels: domains,
                         datasets: [{
-                            label: 'Símptomes (0=Bé, 4=Malament)',
-                            data: scores,
+                            label: 'Símptomes (Mitjana 7 dies)',
+                            data: avgScores,
                             fill: true,
                             backgroundColor: 'rgba(16, 185, 129, 0.2)',
                             borderColor: '#10b981',
@@ -357,7 +373,7 @@
 
                     if(d.testName === 'fluencia_verbal') { icon="microphone"; color="text-blue-500 bg-blue-100"; title="Fluència Verbal"; val=`${d.score} paraules`; }
                     else if(d.testName === 'memoria_treball') { icon="brain"; color="text-purple-500 bg-purple-100"; title="Memòria Treball (Invers)"; val=`${d.score} dígits`; }
-                    else if(d.testName === 'atencio') { icon="eye"; color="text-emerald-500 bg-emerald-100"; title="Atenció (Simple)"; val=`${d.score} dígits`; }
+                    else if(d.testName === 'atencio') { icon="eye"; color="text-emerald-500 bg-emerald-100"; title="Atenció (Simple)"; val=`${d.score} dígits`; } 
                     else if(d.testName === 'velocitat_processament') { icon="lightning"; color="text-orange-500 bg-orange-100"; title="Velocitat"; val=`${d.score_time_seconds.toFixed(2)}s`; }
                     else { icon="clipboard-text"; color="text-slate-500 bg-slate-100"; title="Autoavaluació"; val="Completat"; }
 
@@ -459,23 +475,17 @@
                     <div class="bg-blue-600 text-white p-8 rounded-2xl shadow-xl">
                         <h2 class="text-3xl font-bold mb-2">Vinculació de Pacients</h2>
                         <p class="opacity-80 mb-6">Demana al pacient que escanegi aquest codi des de l'App.</p>
-                        
-                        <div class="bg-white p-4 rounded-xl inline-block shadow-lg mb-6">
-                            <img id="qr-img-big" src="" class="w-64 h-64">
-                        </div>
-                        
+                        <div class="bg-white p-4 rounded-xl inline-block shadow-lg mb-6"><img id="qr-img-big" src="" class="w-64 h-64"></div>
                         <div class="bg-blue-800/50 p-4 rounded-xl">
                             <p class="text-xs uppercase tracking-widest opacity-70 mb-1">Codi Manual</p>
                             <p id="doctor-uid-big" class="text-xl font-mono font-bold tracking-wider select-all">...</p>
                         </div>
                     </div>
-                    
                     <button id="btn-print" onclick="printQR()" class="mt-8 bg-slate-800 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 mx-auto hover:bg-slate-700 transition">
                         <i class="ph ph-printer text-xl"></i> Imprimir / Guardar PDF
                     </button>
                 </div>
             </div>
-
         </main>
     </div>
 </body>

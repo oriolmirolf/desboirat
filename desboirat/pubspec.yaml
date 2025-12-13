@@ -53,6 +53,10 @@ dependencies:
   shared_preferences: ^2.2.2
   url_launcher: ^6.2.4
 
+  flutter_local_notifications: ^16.0.0
+  timezone: ^0.9.2
+  shared_preferences: ^2.2.2
+
 
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1 # Check pub.dev for the latest version

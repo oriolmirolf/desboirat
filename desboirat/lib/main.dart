@@ -9,11 +9,25 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/qr_link_screen.dart';
 import 'services/database_service.dart';
+import 'services/notification_service.dart'; // <--- ADD THIS IMPORT
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // Initialize Firebase
+  await Firebase.initializeApp();
   await dotenv.load(fileName: ".env");
+
+  // --- NOTIFICATION SETUP (NEW) ---
+  await NotificationService().init();
+  
+  // Schedule: 11:00 AM (Games) and 8:00 PM (Subjective)
+  NotificationService().scheduleDailyNotification(
+    1, "Entrena la teva ment", "Tens els jocs d'avui pendents!", 11, 00
+  );
+  NotificationService().scheduleDailyNotification(
+    2, "Com et sents?", "Recorda anotar els teus problemes cognitius.", 20, 00
+  );
+  // --------------------------------
+
   runApp(DesboiratApp());
 }
 
@@ -26,7 +40,7 @@ class DesboiratApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         textTheme: GoogleFonts.latoTextTheme(),
       ),
-      home: AuthGate(), // New Entry Point
+      home: AuthGate(),
     );
   }
 }
@@ -37,7 +51,6 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  // We use this to force a rebuild after linking QR
   Key _key = UniqueKey(); 
 
   @override
@@ -45,29 +58,17 @@ class _AuthGateState extends State<AuthGate> {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // 1. If not logged in -> Login Screen
-        if (!snapshot.hasData) {
-          return LoginScreen();
-        }
+        if (!snapshot.hasData) return LoginScreen();
 
-        // 2. If logged in, check if linked to doctor
         return FutureBuilder<bool>(
-          key: _key, // Changing this key re-runs the FutureBuilder
+          key: _key, 
           future: DatabaseService().isLinkedToDoctor(),
           builder: (context, linkSnapshot) {
             if (linkSnapshot.connectionState == ConnectionState.waiting) {
               return Scaffold(body: Center(child: CircularProgressIndicator()));
             }
-
             bool isLinked = linkSnapshot.data ?? false;
-
-            if (isLinked) {
-              return HomeScreen();
-            } else {
-              return QRLinkScreen(onLinked: () {
-                setState(() => _key = UniqueKey()); // Refresh to go to Home
-              });
-            }
+            return isLinked ? HomeScreen() : QRLinkScreen(onLinked: () => setState(() => _key = UniqueKey()));
           },
         );
       },
