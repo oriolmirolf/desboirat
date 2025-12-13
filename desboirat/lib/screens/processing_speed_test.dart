@@ -15,6 +15,7 @@ class _ProcessingSpeedTestState extends State<ProcessingSpeedTest> {
   
   // Track visual feedback (red flash on error)
   int? _errorIndex; 
+  Timer? _timer; // To update the UI every second
 
   @override
   void initState() {
@@ -23,12 +24,23 @@ class _ProcessingSpeedTestState extends State<ProcessingSpeedTest> {
     numbers.shuffle(); 
   }
 
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
   void startGame() {
     setState(() {
       currentTarget = 1;
       isGameActive = true;
       stopwatch.reset();
       stopwatch.start();
+      
+      // OPTIONAL: This timer updates the clock text while playing
+      _timer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+        setState(() {}); 
+      });
     });
   }
 
@@ -45,6 +57,7 @@ class _ProcessingSpeedTestState extends State<ProcessingSpeedTest> {
       // Win Condition: All numbers pressed
       if (currentTarget > numbers.length) {
         stopwatch.stop();
+        _timer?.cancel(); // Stop UI updates
         _showResult();
       }
     } else {
@@ -71,10 +84,9 @@ class _ProcessingSpeedTestState extends State<ProcessingSpeedTest> {
             Icon(Icons.timer, size: 50, color: Colors.blue),
             SizedBox(height: 10),
             Text(
-              "${stopwatch.elapsedMilliseconds} ms", 
+              "Temps: ${(stopwatch.elapsedMilliseconds / 1000).toStringAsFixed(1)}s",
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)
             ),
-            Text("Temps total"),
           ],
         ),
         actions: [
@@ -100,6 +112,48 @@ class _ProcessingSpeedTestState extends State<ProcessingSpeedTest> {
     );
   }
 
+  // --- INFO BOX WIDGET ---
+  Widget _buildInfoBox() {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50, // Light blue background
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.blue.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 5,
+            offset: Offset(0, 5),
+          )
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue),
+              SizedBox(width: 10),
+              Text(
+                "Com jugar",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue.shade900),
+              ),
+            ],
+          ),
+          SizedBox(height: 10),
+          Text(
+            // UPDATED TEXT FOR THIS GAME
+            "1. Busca el número 1 i prem-lo.\n2. Continua en ordre (2, 3, 4...) fins al 16.\n3. Fes-ho tan ràpid com puguis!",
+            style: TextStyle(fontSize: 16, color: Colors.black87),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -113,26 +167,41 @@ class _ProcessingSpeedTestState extends State<ProcessingSpeedTest> {
             child: Column(
               children: [
                 Text(
-                  isGameActive ? "Prem el número: $currentTarget" : "Prem 'COMENÇAR'",
+                  isGameActive ? "Busca el número: $currentTarget" : "Preparat?",
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 if (isGameActive)
-                   Text("Temps: ${(stopwatch.elapsedMilliseconds / 1000).toStringAsFixed(1)}s"),
+                   Text(
+                     "Temps: ${(stopwatch.elapsedMilliseconds / 1000).toStringAsFixed(1)}s",
+                     style: TextStyle(fontSize: 18),
+                   ),
               ],
             ),
           ),
+          
+          // --- START SCREEN (Info Box + Button) ---
           if (!isGameActive)
             Expanded(
-              child: Center(
-                child: ElevatedButton(
-                  onPressed: startGame,
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                  ),
-                  child: Text("COMENÇAR TEST", style: TextStyle(fontSize: 20)),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(height: 20),
+                    _buildInfoBox(), // <--- BOX ADDED HERE
+                    SizedBox(height: 40),
+                    ElevatedButton(
+                      onPressed: startGame,
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                      ),
+                      child: Text("COMENÇAR TEST", style: TextStyle(fontSize: 20)),
+                    ),
+                  ],
                 ),
               ),
             ),
+
+          // --- GAME SCREEN (Grid) ---
           if (isGameActive)
             Expanded(
               child: GridView.builder(
