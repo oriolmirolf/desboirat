@@ -207,11 +207,11 @@ class _FluencyTestScreenState extends State<FluencyTestScreen> {
               backgroundColor: AppColors.deepSlate, // THEME
               foregroundColor: AppColors.cream,     // THEME
             ),
-            onPressed: () { 
-              Navigator.pop(ctx); 
-              _generateRandomChallenge(); 
+            onPressed: () {
+              Navigator.pop(ctx); // Close dialog
+              Navigator.pop(context); // Go back to Home
             }, 
-            child: Text("Nou Repte")
+            child: Text("Tornar"),
           )
         ],
       ),

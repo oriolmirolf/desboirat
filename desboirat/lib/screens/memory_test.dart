@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:math';
-import '../theme/app_colors.dart'; // Ensure this matches your folder structure
-import '../services/database_service.dart'; // ADDED THIS IMPORT
+import '../theme/app_colors.dart'; 
+import '../services/database_service.dart'; 
 import '../services/daily_tracker.dart';
 
 class DigitSpanTest extends StatefulWidget {
@@ -15,14 +15,28 @@ class DigitSpanTest extends StatefulWidget {
 
 class _DigitSpanTestState extends State<DigitSpanTest> {
   List<int> _sequence = [];
-  int _digits = 3; // Start with 3 digits
-  int _lives = 2;  // Fail 2 times at same level = Game Over
+  
+  // CHANGED: Removed initial value assignment here. 
+  // It is now set in initState based on the game mode.
+  late int _digits; 
+  
+  int _lives = 2;  
   
   String _displayNumber = "";
   bool _showInput = false;
   TextEditingController _controller = TextEditingController();
   FocusNode _inputFocusNode = FocusNode(); 
   String _message = "Prem 'Iniciar' per començar";
+
+  // CHANGED: Added initState to configure starting difficulty
+  @override
+  void initState() {
+    super.initState();
+    // Logic: 
+    // If Reverse (Working Memory) -> Start at 3
+    // If Forward (Attention)      -> Start at 4
+    _digits = widget.isReverse ? 3 : 4;
+  }
 
   void _startGame() {
     setState(() {
@@ -49,11 +63,11 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
       await Future.delayed(Duration(milliseconds: 200));
     }
     setState(() {
-      _displayNumber = "?";
+      _displayNumber = " ";
       _showInput = true;
       _message = widget.isReverse ? "Escriu AL REVÉS" : "Escriu en el MATEIX ORDRE";
     });
-    // Auto-focus the input when it appears
+    
     Future.delayed(Duration(milliseconds: 100), () {
       FocusScope.of(context).requestFocus(_inputFocusNode);
     });
@@ -61,7 +75,6 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
 
   void _checkAnswer() {
     String input = _controller.text;
-    // Normalize input (remove spaces/dashes)
     String cleanInput = input.replaceAll(RegExp(r'[^0-9]'), '');
     
     String correctStr = widget.isReverse 
@@ -69,14 +82,29 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
         : _sequence.join();
 
     if (cleanInput == correctStr) {
-      // Correct! Reset lives and increase difficulty
-      setState(() {
-        _digits++;
-        _lives = 2; 
-        _message = "Correcte! Nivell següent: $_digits dígits";
-        _showInput = false;
-      });
-      Future.delayed(Duration(seconds: 1), _startGame);
+      // --- CHANGED: Max Level Logic ---
+      // Define max based on mode (8 for reverse, 9 for forward)
+      int maxDigits = widget.isReverse ? 8 : 9;
+
+      if (_digits >= maxDigits) {
+        // User completed the maximum level!
+        setState(() {
+          _digits++; // Increment one last time so the score calculation (_digits - 1) is correct
+          _message = "Felicitats! Has completat el test.";
+          _showInput = false;
+        });
+        // End the game immediately as a victory
+        _showGameOver(isVictory: true);
+      } else {
+        // Standard progression: Reset lives and increase difficulty
+        setState(() {
+          _digits++;
+          _lives = 2; 
+          _message = "Correcte! Nivell següent: $_digits dígits";
+          _showInput = false;
+        });
+        Future.delayed(Duration(seconds: 1), _startGame);
+      }
     } else {
       // Incorrect
       setState(() {
@@ -88,7 +116,7 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
       } else {
         setState(() {
           _message = "Incorrecte. Et queda 1 intent amb $_digits dígits.";
-          _generateSequence(); // Try different numbers same length
+          _generateSequence(); 
           _showInput = false;
         });
         Future.delayed(Duration(seconds: 2), _playSequence);
@@ -97,10 +125,10 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
     _controller.clear();
   }
 
-  void _showGameOver() {
+  void _showGameOver({bool isVictory = false}) {
     // --- DATABASE SAVE ---
     DatabaseService().saveResult(widget.isReverse ? 'memoria_treball' : 'atencio', {
-      'score': _digits - 1, // Max digits successfully remembered
+      'score': _digits - 1, 
       'test_type': widget.isReverse ? 'reverse' : 'forward',
     });
 
@@ -114,16 +142,28 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        backgroundColor: AppColors.cream, // New Theme
-        title: Text("Test Finalitzat", style: TextStyle(color: AppColors.deepSlate)),
-        content: Text("Has arribat a recordar ${_digits-1} dígits.", style: TextStyle(color: AppColors.deepSlate)),
+        backgroundColor: AppColors.cream, 
+        title: Text(
+          isVictory ? "Enhorabona!" : "Test Finalitzat", 
+          style: TextStyle(color: AppColors.deepSlate, fontWeight: FontWeight.bold)
+        ),
+        content: Text(
+          isVictory 
+            ? "Has completat el màxim nivell! (${_digits-1} dígits)."
+            : "Has arribat a recordar ${_digits-1} dígits.", 
+          style: TextStyle(color: AppColors.deepSlate)
+        ),
         actions: [
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.deepSlate, // THEME
+              foregroundColor: AppColors.cream,     // THEME
+            ),
             onPressed: () {
               Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Back to menu
-            },
-            child: Text("Sortir", style: TextStyle(color: AppColors.deepSlate, fontWeight: FontWeight.bold)),
+              Navigator.pop(context); // Go back to Home
+            }, 
+            child: Text("Tornar"),
           )
         ],
       ),
@@ -136,7 +176,6 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
     return Stack(
       alignment: Alignment.center,
       children: [
-        // LAYER 1: The Visual Boxes
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(_digits, (index) {
@@ -151,12 +190,11 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 border: Border.all(
-                  // CHANGED: Uses deepSlate for active instead of Blue
                   color: char.isNotEmpty ? AppColors.deepSlate : Colors.grey,
                   width: 2
                 ),
                 borderRadius: BorderRadius.circular(10),
-                color: AppColors.cream, // CHANGED: Cream background
+                color: AppColors.cream, 
               ),
               child: Text(
                 char,
@@ -166,7 +204,6 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
           }),
         ),
         
-        // LAYER 2: The Invisible TextField
         Opacity(
           opacity: 0.0, 
           child: SizedBox(
@@ -199,9 +236,9 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
       margin: EdgeInsets.all(20),
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.cream, // CHANGED: Cream instead of blue.shade50
+        color: AppColors.cream, 
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: AppColors.deepSlate.withOpacity(0.3)), // CHANGED: Subtler border
+        border: Border.all(color: AppColors.deepSlate.withOpacity(0.3)), 
         boxShadow: [
           BoxShadow(
             color: Colors.black12,
@@ -215,11 +252,11 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.info_outline, color: AppColors.deepSlate), // CHANGED: Icon color
+              Icon(Icons.info_outline, color: AppColors.deepSlate), 
               SizedBox(width: 10),
               Text(
                 "Com jugar",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.deepSlate), // CHANGED: Text color
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.deepSlate), 
               ),
             ],
           ),
@@ -228,7 +265,7 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
             widget.isReverse
                 ? "1. Memoritza els números que apareixen.\n2. Quan acabin, escriu-los en ordre INVERS (de l'últim al primer)."
                 : "1. Memoritza els números que apareixen.\n2. Quan acabin, escriu-los en el MATEIX ordre.",
-            style: TextStyle(fontSize: 16, color: AppColors.deepSlate), // CHANGED: Text color
+            style: TextStyle(fontSize: 16, color: AppColors.deepSlate), 
             textAlign: TextAlign.center,
           ),
         ],
@@ -239,31 +276,28 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true, // ADDED: Lets gradient show behind AppBar
+      extendBodyBehindAppBar: true, 
       appBar: AppBar(
         title: Text(
           widget.isReverse ? "Memòria de Treball" : "Atenció",
           style: TextStyle(color: AppColors.deepSlate, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Colors.transparent, // CHANGED: Transparent
+        backgroundColor: Colors.transparent, 
         elevation: 0,
-        iconTheme: IconThemeData(color: AppColors.deepSlate), // Back button color
+        iconTheme: IconThemeData(color: AppColors.deepSlate), 
       ),
       body: Container(
-        // ADDED: The Main Gradient Background
         decoration: BoxDecoration(
           gradient: AppColors.mainGradient,
         ),
         child: Center(
           child: Column(
-            // mainAxisAlignment: MainAxisAlignment.center, 
             children: [
-              // Adjusted spacer to account for the transparent AppBar
               SizedBox(height: 100), 
               
               Container(
                 padding: EdgeInsets.all(20),
-                color: AppColors.cream.withOpacity(0.5), // CHANGED: Translucent cream
+                color: AppColors.cream.withOpacity(0.5), 
                 width: double.infinity,
                 child: Column(
                   children: [
@@ -281,14 +315,12 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
               
               SizedBox(height: 40),
               
-              // Display Number Logic
               if (!_showInput)
                 Text(
                   _displayNumber,
-                  style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: AppColors.deepSlate), // CHANGED: Text Color
+                  style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: AppColors.deepSlate), 
                 ),
               
-              // Input Boxes Logic
               if (_showInput)
                 _buildInputBoxes(),
 
@@ -297,15 +329,15 @@ class _DigitSpanTestState extends State<DigitSpanTest> {
               if (!_showInput && _displayNumber == "")
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.cream, // CHANGED: Button Color
-                    foregroundColor: AppColors.deepSlate, // CHANGED: Text Color
+                    backgroundColor: AppColors.cream, 
+                    foregroundColor: AppColors.deepSlate, 
                   ),
                   onPressed: _startGame, 
                   child: Text("INICIAR")
                 ),
                 
               if (_showInput)
-                 SizedBox.shrink(), // Button hidden as per previous functionality
+                 SizedBox.shrink(), 
             ],
           ),
         ),

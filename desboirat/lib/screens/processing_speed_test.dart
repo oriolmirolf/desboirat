@@ -108,27 +108,17 @@ class _ProcessingSpeedTestState extends State<ProcessingSpeedTest> {
           ],
         ),
         actions: [
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.deepSlate, // THEME
+              foregroundColor: AppColors.cream,     // THEME
+            ),
             onPressed: () {
               Navigator.pop(ctx); // Close dialog
               Navigator.pop(context); // Go back to Home
-            },
-            child: Text("Tornar", style: TextStyle(color: AppColors.deepSlate)),
+            }, 
+            child: Text("Tornar"),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.skyBlue,
-              foregroundColor: AppColors.cream,
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() {
-                numbers.shuffle();
-                startGame();
-              });
-            },
-            child: Text("Repetir"),
-          )
         ],
       ),
     );
