@@ -21,7 +21,8 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        .active-tab { border-bottom: 2px solid #2563eb; color: #2563eb; font-weight: 600; }
+        /* REBRANDED COLORS (Teal/Cyan instead of Blue) */
+        .active-tab { border-bottom: 2px solid #0d9488; color: #0d9488; font-weight: 600; } /* Teal-600 */
         .inactive-tab { border-bottom: 2px solid transparent; color: #64748b; }
         .inactive-tab:hover { color: #334155; }
 
@@ -63,7 +64,7 @@
         let objChartInstance = null;
         let subjChartInstance = null;
         let doctorUid = "";
-        let currentPatientId = ""; // Stores the currently selected patient ID
+        let currentPatientId = "";
 
         // --- AUTH ---
         window.login = async () => {
@@ -100,7 +101,7 @@
         window.showMainView = () => {
             document.getElementById('view-main').classList.remove('hidden');
             document.getElementById('view-qr').classList.add('hidden');
-            document.getElementById('nav-patients').className = "flex items-center gap-3 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium cursor-pointer transition";
+            document.getElementById('nav-patients').className = "flex items-center gap-3 px-3 py-2 bg-teal-50 text-teal-700 rounded-lg font-medium cursor-pointer transition";
             document.getElementById('nav-qr').className = "flex items-center gap-3 px-3 py-2 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-lg font-medium cursor-pointer transition";
         };
 
@@ -108,32 +109,27 @@
             document.getElementById('view-main').classList.add('hidden');
             document.getElementById('view-qr').classList.remove('hidden');
             document.getElementById('nav-patients').className = "flex items-center gap-3 px-3 py-2 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-lg font-medium cursor-pointer transition";
-            document.getElementById('nav-qr').className = "flex items-center gap-3 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium cursor-pointer transition";
+            document.getElementById('nav-qr').className = "flex items-center gap-3 px-3 py-2 bg-teal-50 text-teal-700 rounded-lg font-medium cursor-pointer transition";
         };
 
         window.printQR = () => window.print();
 
-// --- 🔔 "FAKE" NOTIFICATION LOGIC (FIXED) ---
+        // --- 🔔 NOTIFICATION LOGIC ---
         window.sendNotification = async () => {
             if (!currentPatientId) return;
 
             const btn = document.getElementById('btn-notify');
-            
-            // 1. PREVENT SPAM (Check if already busy)
             if (btn.disabled) return; 
-            btn.disabled = true; // Lock the button
+            btn.disabled = true; 
 
-            // Define the "Standard" (Yellow) look hardcoded so we never lose it
             const standardClasses = "text-xs font-bold bg-amber-100 text-amber-700 px-3 py-1 rounded-full hover:bg-amber-200 transition flex items-center gap-2 mb-3 cursor-pointer";
             const standardHTML = `<i class="ph ph-bell-ringing"></i> Enviar Recordatori`;
 
-            // 2. Show "Sending..." State
             btn.className = "text-xs font-bold bg-slate-100 text-slate-500 px-3 py-1 rounded-full flex items-center gap-2 mb-3 cursor-not-allowed";
             btn.innerHTML = `<i class="ph ph-spinner animate-spin"></i> Enviant...`;
             
             try {
                 const message = "El teu doctor et recorda que has de realitzar els exercicis d'avui.";
-                
                 await updateDoc(doc(db, "users", currentPatientId), {
                     trigger_notification: {
                         message: message,
@@ -141,27 +137,24 @@
                     }
                 });
 
-                // 3. Show "Success" State (Green)
                 btn.className = "text-xs font-bold bg-green-100 text-green-700 px-3 py-1 rounded-full flex items-center gap-2 mb-3 cursor-default";
                 btn.innerHTML = `<i class="ph ph-check-circle"></i> Enviat!`;
 
-                // 4. Revert after 2 seconds
                 setTimeout(() => {
                     btn.className = standardClasses;
                     btn.innerHTML = standardHTML;
-                    btn.disabled = false; // Unlock the button
+                    btn.disabled = false; 
                 }, 2000);
 
             } catch (error) {
                 console.error(error);
-                // Show Error State
                 btn.className = "text-xs font-bold bg-red-100 text-red-700 px-3 py-1 rounded-full flex items-center gap-2 mb-3";
                 btn.innerHTML = `<i class="ph ph-warning"></i> Error`;
                 
                 setTimeout(() => {
                     btn.className = standardClasses;
                     btn.innerHTML = standardHTML;
-                    btn.disabled = false; // Unlock
+                    btn.disabled = false; 
                 }, 2000);
             }
         };
@@ -173,6 +166,7 @@
             document.getElementById('doctor-uid-big').innerText = uid;
         }
 
+        // --- LOAD PATIENTS ---
         function loadPatients(doctorId) {
             const q = query(collection(db, "users"), where("doctorId", "==", doctorId));
             onSnapshot(q, (snapshot) => {
@@ -182,27 +176,33 @@
 
                 snapshot.forEach(doc => {
                     const data = doc.data();
+                    // 🟢 DEBUGGING NAMES: Open Console (F12) to see what's in the DB
+                    console.log("Patient Data from DB:", data);
+
+                    const patientName = data.displayName || data.email || 'Sense Nom';
+                    const initial = patientName.charAt(0).toUpperCase();
+
                     const el = document.createElement('div');
-                    el.className = "group p-4 border-b border-slate-100 hover:bg-blue-50 cursor-pointer transition flex items-center gap-3";
-                    el.onclick = () => loadPatientDetails(doc.id, data.email);
+                    el.className = "group p-4 border-b border-slate-100 hover:bg-teal-50 cursor-pointer transition flex items-center gap-3";
+                    el.onclick = () => loadPatientDetails(doc.id, patientName);
                     el.innerHTML = `
-                        <div class="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold group-hover:bg-blue-200 group-hover:text-blue-700 transition">
-                            ${data.email ? data.email[0].toUpperCase() : '?'}
+                        <div class="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold group-hover:bg-teal-200 group-hover:text-teal-800 transition">
+                            ${initial}
                         </div>
                         <div class="flex-1">
-                            <p class="font-semibold text-slate-700 group-hover:text-blue-900">${data.email || 'Sense Nom'}</p>
+                            <p class="font-semibold text-slate-700 group-hover:text-teal-900 truncate">${patientName}</p>
                             <p class="text-xs text-slate-400 font-mono">ID: ${doc.id.slice(0,6)}...</p>
                         </div>
-                        <i class="ph ph-caret-right text-slate-300 group-hover:text-blue-500"></i>
+                        <i class="ph ph-caret-right text-slate-300 group-hover:text-teal-500"></i>
                     `;
                     list.appendChild(el);
                 });
             });
         }
 
-        window.loadPatientDetails = async (patientId, email) => {
-            currentPatientId = patientId; // SAVE ID FOR NOTIFICATIONS
-            document.getElementById('selected-patient-name').innerText = email || "Pacient";
+        window.loadPatientDetails = async (patientId, patientName) => {
+            currentPatientId = patientId;
+            document.getElementById('selected-patient-name').innerText = patientName;
             document.getElementById('empty-state').classList.add('hidden');
             document.getElementById('patient-stats').classList.remove('hidden');
             
@@ -239,10 +239,9 @@
 
         // --- RENDERERS ---
 
-function renderObjectiveView(container) {
+        function renderObjectiveView(container) {
             const objectiveData = allPatientResults.filter(d => d.testName !== 'qüestionari_subjectiu');
             
-            // 1. CARDS (Top Stats - Same as before)
             const topStats = document.createElement('div');
             topStats.className = "grid grid-cols-4 gap-4 mb-6 fade-in";
             
@@ -258,26 +257,25 @@ function renderObjectiveView(container) {
             const avgSpeed = speedCount > 0 ? (speedSum / speedCount).toFixed(1) : '-';
 
             topStats.innerHTML = `
-                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                    <div class="flex items-center gap-2 mb-1 text-blue-600 font-semibold text-xs uppercase"><i class="ph ph-microphone"></i> Fluència</div>
+                <div class="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
+                    <div class="flex items-center gap-2 mb-1 text-cyan-700 font-semibold text-xs uppercase"><i class="ph ph-microphone"></i> Fluència</div>
                     <div class="text-2xl font-bold text-slate-800">${maxFluency} <span class="text-xs font-normal text-slate-500">paraules</span></div>
                 </div>
-                <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                    <div class="flex items-center gap-2 mb-1 text-emerald-600 font-semibold text-xs uppercase"><i class="ph ph-eye"></i> Atenció</div>
+                <div class="bg-teal-50 p-4 rounded-xl border border-teal-100">
+                    <div class="flex items-center gap-2 mb-1 text-teal-700 font-semibold text-xs uppercase"><i class="ph ph-eye"></i> Atenció</div>
                     <div class="text-2xl font-bold text-slate-800">${maxAttention} <span class="text-xs font-normal text-slate-500">dígits</span></div>
                 </div>
-                <div class="bg-purple-50 p-4 rounded-xl border border-purple-100">
-                    <div class="flex items-center gap-2 mb-1 text-purple-600 font-semibold text-xs uppercase"><i class="ph ph-brain"></i> M. Treball</div>
+                <div class="bg-sky-50 p-4 rounded-xl border border-sky-100">
+                    <div class="flex items-center gap-2 mb-1 text-sky-700 font-semibold text-xs uppercase"><i class="ph ph-brain"></i> M. Treball</div>
                     <div class="text-2xl font-bold text-slate-800">${maxWorkingMem} <span class="text-xs font-normal text-slate-500">dígits</span></div>
                 </div>
-                <div class="bg-orange-50 p-4 rounded-xl border border-orange-100">
-                    <div class="flex items-center gap-2 mb-1 text-orange-600 font-semibold text-xs uppercase"><i class="ph ph-lightning"></i> Velocitat</div>
+                <div class="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                    <div class="flex items-center gap-2 mb-1 text-amber-700 font-semibold text-xs uppercase"><i class="ph ph-lightning"></i> Velocitat</div>
                     <div class="text-2xl font-bold text-slate-800">${avgSpeed} <span class="text-xs font-normal text-slate-500">s</span></div>
                 </div>
             `;
             container.appendChild(topStats);
 
-            // 2. CHART (FIXED LOGIC HERE)
             const chartContainer = document.createElement('div');
             chartContainer.className = "bg-white p-4 rounded-xl border border-slate-200 mb-6 shadow-sm fade-in h-80 relative";
             chartContainer.innerHTML = '<canvas id="objChart"></canvas>';
@@ -287,40 +285,23 @@ function renderObjectiveView(container) {
                 if (objChartInstance) objChartInstance.destroy();
                 const ctx = document.getElementById('objChart').getContext('2d');
                 
-                // A. Sort Chronologically (Oldest -> Newest)
                 const ascData = [...objectiveData].reverse();
-                
-                // B. Group by Date using a Map
-                // This Map ensures each date string only appears once.
                 const uniqueDatesMap = new Map();
                 
                 ascData.forEach(d => {
                     const dateLabel = new Date(d.timestamp.seconds * 1000).toLocaleDateString();
-                    
-                    // Initialize the day object if it doesn't exist yet
                     if (!uniqueDatesMap.has(dateLabel)) {
-                        uniqueDatesMap.set(dateLabel, {
-                            fluencia: null, 
-                            atencio: null, 
-                            memoria: null, 
-                            velocitat: null
-                        });
+                        uniqueDatesMap.set(dateLabel, { fluencia: null, atencio: null, memoria: null, velocitat: null });
                     }
-                    
                     const dayData = uniqueDatesMap.get(dateLabel);
-                    
-                    // C. Assign score
-                    // Since we iterate chronologically, later tests on the same day overwrite earlier ones (showing the "latest")
                     if (d.testName === 'fluencia_verbal') dayData.fluencia = d.score;
                     else if (d.testName === 'atencio') dayData.atencio = d.score;
                     else if (d.testName === 'memoria_treball') dayData.memoria = d.score;
                     else if (d.testName === 'velocitat_processament') dayData.velocitat = d.score_time_seconds;
                 });
                 
-                // D. Extract grouped data arrays
                 const labels = Array.from(uniqueDatesMap.keys());
                 const dayValues = Array.from(uniqueDatesMap.values());
-                
                 const fluencyPoints = dayValues.map(p => p.fluencia);
                 const attentionPoints = dayValues.map(p => p.atencio);
                 const workingMemPoints = dayValues.map(p => p.memoria);
@@ -331,10 +312,10 @@ function renderObjectiveView(container) {
                     data: {
                         labels: labels,
                         datasets: [
-                            { label: 'Fluència', data: fluencyPoints, borderColor: '#2563eb', backgroundColor: '#2563eb', spanGaps: true, tension: 0.3, pointRadius: 4 }, 
-                            { label: 'Atenció (Simple)', data: attentionPoints, borderColor: '#10b981', backgroundColor: '#10b981', spanGaps: true, tension: 0.3, pointRadius: 4 }, 
-                            { label: 'M. Treball (Invers)', data: workingMemPoints, borderColor: '#9333ea', backgroundColor: '#9333ea', spanGaps: true, tension: 0.3, pointRadius: 4 }, 
-                            { label: 'Velocitat (s)', data: speedPoints, borderColor: '#f97316', backgroundColor: '#f97316', spanGaps: true, tension: 0.3, pointRadius: 4 } 
+                            { label: 'Fluència', data: fluencyPoints, borderColor: '#0891b2', backgroundColor: '#0891b2', spanGaps: true, tension: 0.3, pointRadius: 4 },
+                            { label: 'Atenció (Simple)', data: attentionPoints, borderColor: '#0d9488', backgroundColor: '#0d9488', spanGaps: true, tension: 0.3, pointRadius: 4 },
+                            { label: 'M. Treball (Invers)', data: workingMemPoints, borderColor: '#0284c7', backgroundColor: '#0284c7', spanGaps: true, tension: 0.3, pointRadius: 4 },
+                            { label: 'Velocitat (s)', data: speedPoints, borderColor: '#d97706', backgroundColor: '#d97706', spanGaps: true, tension: 0.3, pointRadius: 4 }
                         ]
                     },
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } }
@@ -344,7 +325,6 @@ function renderObjectiveView(container) {
             renderHistoryList(container, objectiveData);
         }
 
-        // --- UPDATED SUBJECTIVE LOGIC (7 DAY AVERAGE) ---
         function renderSubjectiveView(container) {
             const subjectiveData = allPatientResults.filter(d => d.testName === 'qüestionari_subjectiu');
             
@@ -358,11 +338,8 @@ function renderObjectiveView(container) {
             sevenDaysAgo.setDate(now.getDate() - 7);
 
             const recentDocs = subjectiveData.filter(d => new Date(d.timestamp.seconds * 1000) >= sevenDaysAgo);
-            
             const domains = ["Atenció", "Velocitat Proc.", "Fluència Verbal", "Memòria", "Funcions Exec."];
-            // Q0(Atenció), Q1(Velocitat), Q2(Fluència), Q3(Atenció), Q4(Memòria), Q5(Memòria), Q6(Exec), Q7(Exec)
             const questionToDomain = [0, 1, 2, 0, 3, 3, 4, 4];
-            
             let domainSums = [0,0,0,0,0];
             let domainCounts = [0,0,0,0,0];
 
@@ -372,7 +349,6 @@ function renderObjectiveView(container) {
                         const qIdx = parseInt(qKey);
                         const val = doc.answers_map[qKey];
                         const domainIdx = questionToDomain[qIdx];
-                        
                         if(domainIdx !== undefined) {
                             domainSums[domainIdx] += val;
                             domainCounts[domainIdx]++;
@@ -391,16 +367,16 @@ function renderObjectiveView(container) {
             chartCard.innerHTML = '<canvas id="subjChart"></canvas>';
             
             const textCard = document.createElement('div');
-            textCard.className = "bg-emerald-50 p-6 rounded-xl border border-emerald-100 flex flex-col justify-center";
+            textCard.className = "bg-teal-50 p-6 rounded-xl border border-teal-100 flex flex-col justify-center";
             textCard.innerHTML = `
-                <h3 class="text-emerald-800 font-bold text-lg mb-2"><i class="ph ph-calendar-check"></i> Mitjana (Últims 7 dies)</h3>
-                <p class="text-emerald-700 text-sm mb-4">Registres analitzats: ${recentDocs.length}</p>
+                <h3 class="text-teal-800 font-bold text-lg mb-2"><i class="ph ph-calendar-check"></i> Mitjana (Últims 7 dies)</h3>
+                <p class="text-teal-700 text-sm mb-4">Registres analitzats: ${recentDocs.length}</p>
                 <div class="space-y-2">
-                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Atenció:</span> <span class="font-bold">${avgScores[0]}/4</span></div>
-                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Velocitat:</span> <span class="font-bold">${avgScores[1]}/4</span></div>
-                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Fluència:</span> <span class="font-bold">${avgScores[2]}/4</span></div>
-                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Memòria:</span> <span class="font-bold">${avgScores[3]}/4</span></div>
-                    <div class="flex justify-between text-sm"><span class="text-emerald-600">Fun. Executives:</span> <span class="font-bold">${avgScores[4]}/4</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-teal-600">Atenció:</span> <span class="font-bold">${avgScores[0]}/4</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-teal-600">Velocitat:</span> <span class="font-bold">${avgScores[1]}/4</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-teal-600">Fluència:</span> <span class="font-bold">${avgScores[2]}/4</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-teal-600">Memòria:</span> <span class="font-bold">${avgScores[3]}/4</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-teal-600">Fun. Executives:</span> <span class="font-bold">${avgScores[4]}/4</span></div>
                 </div>
             `;
 
@@ -420,9 +396,9 @@ function renderObjectiveView(container) {
                             label: 'Símptomes (Mitjana 7 dies)',
                             data: avgScores,
                             fill: true,
-                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                            borderColor: '#10b981',
-                            pointBackgroundColor: '#10b981',
+                            backgroundColor: 'rgba(13, 148, 136, 0.2)', 
+                            borderColor: '#0d9488', 
+                            pointBackgroundColor: '#0d9488',
                         }]
                     },
                     options: { responsive: true, maintainAspectRatio: false, scales: { r: { suggestedMin: 0, suggestedMax: 4 } } }
@@ -446,15 +422,15 @@ function renderObjectiveView(container) {
             } else {
                 data.forEach(d => {
                     const row = document.createElement('div');
-                    row.className = "flex items-center justify-between p-4 border-b border-slate-100 hover:bg-slate-50 transition last:border-0";
+                    row.className = "flex items-center justify-between p-4 border-b border-slate-100 hover:bg-teal-50 transition last:border-0";
                     
                     let icon, color, title, val;
                     const date = new Date(d.timestamp.seconds * 1000).toLocaleDateString();
 
-                    if(d.testName === 'fluencia_verbal') { icon="microphone"; color="text-blue-500 bg-blue-100"; title="Fluència Verbal"; val=`${d.score} paraules`; }
-                    else if(d.testName === 'memoria_treball') { icon="brain"; color="text-purple-500 bg-purple-100"; title="Memòria Treball (Invers)"; val=`${d.score} dígits`; }
-                    else if(d.testName === 'atencio') { icon="eye"; color="text-emerald-500 bg-emerald-100"; title="Atenció (Simple)"; val=`${d.score} dígits`; } 
-                    else if(d.testName === 'velocitat_processament') { icon="lightning"; color="text-orange-500 bg-orange-100"; title="Velocitat"; val=`${d.score_time_seconds.toFixed(2)}s`; }
+                    if(d.testName === 'fluencia_verbal') { icon="microphone"; color="text-cyan-700 bg-cyan-100"; title="Fluència Verbal"; val=`${d.score} paraules`; }
+                    else if(d.testName === 'memoria_treball') { icon="brain"; color="text-sky-700 bg-sky-100"; title="Memòria Treball (Invers)"; val=`${d.score} dígits`; }
+                    else if(d.testName === 'atencio') { icon="eye"; color="text-teal-700 bg-teal-100"; title="Atenció (Simple)"; val=`${d.score} dígits`; } 
+                    else if(d.testName === 'velocitat_processament') { icon="lightning"; color="text-amber-700 bg-amber-100"; title="Velocitat"; val=`${d.score_time_seconds.toFixed(2)}s`; }
                     else { icon="clipboard-text"; color="text-slate-500 bg-slate-100"; title="Autoavaluació"; val="Completat"; }
 
                     row.innerHTML = `
@@ -474,33 +450,40 @@ function renderObjectiveView(container) {
         }
     </script>
 
-    <div id="login-screen" class="flex-1 flex items-center justify-center bg-slate-50 fade-in p-4">
-        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm border border-slate-100">
-            <div class="text-center mb-8">
-                <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-3xl mx-auto mb-4 shadow-lg shadow-blue-200"><i class="ph ph-brain"></i></div>
-                <h1 class="text-2xl font-bold text-slate-800">Desboira't PRO</h1>
-                <p class="text-slate-400 text-sm">Accés per a professionals</p>
+    <div id="login-screen" class="flex-1 flex flex-col items-center justify-center bg-slate-50 fade-in p-4">
+        <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm border border-slate-100 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-teal-400 to-cyan-500"></div>
+            
+            <div class="text-center mb-8 mt-4">
+                <img src="assets/app-logo.png" alt="Desboira't Logo" class="w-24 h-24 mx-auto mb-4 drop-shadow-[0_10px_15px_rgba(13,148,136,0.3)] transition hover:scale-105">
+                <h1 class="text-3xl font-bold text-slate-800">Desboira't PRO</h1>
+                <p class="text-slate-500 text-sm mt-2">Accés per a professionals</p>
             </div>
-            <div class="space-y-3">
-                <input id="email" type="email" placeholder="nom@hospital.cat" class="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm">
-                <input id="password" type="password" placeholder="••••••••" class="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm">
+            <div class="space-y-4 mb-6">
+                <input id="email" type="email" placeholder="nom@hospital.cat" class="w-full p-3 rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none text-sm transition">
+                <input id="password" type="password" placeholder="••••••••" class="w-full p-3 rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none text-sm transition">
             </div>
-            <button onclick="login()" class="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-md shadow-blue-100">Iniciar Sessió</button>
-            <button onclick="loginGoogle()" class="w-full mt-3 bg-white border border-slate-200 text-slate-600 font-semibold py-3 rounded-xl hover:bg-slate-50 flex items-center justify-center gap-2">
+            <button onclick="login()" class="w-full bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-bold py-3.5 rounded-xl shadow-md shadow-teal-100 transition transform hover:scale-[1.02] active:scale-[0.98]">Iniciar Sessió</button>
+            <button onclick="loginGoogle()" class="w-full mt-3 bg-white border border-slate-200 text-slate-700 font-semibold py-3.5 rounded-xl hover:bg-slate-50 flex items-center justify-center gap-2 transition">
                 <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5"> Entrar amb Google
             </button>
-            <div class="mt-6 text-center"><button onclick="register()" class="text-xs text-blue-500 font-semibold hover:underline">Registrar nou compte</button></div>
+            <div class="mt-6 text-center"><button onclick="register()" class="text-xs text-teal-600 font-semibold hover:underline">Registrar nou compte</button></div>
+
+             <div class="mt-8 pt-6 border-t border-slate-100 flex justify-center">
+                <img src="assets/ico-logo.png" alt="ICO Logo" class="h-10 transition">
+            </div>
         </div>
     </div>
 
     <div id="dashboard-screen" class="hidden flex-1 flex h-screen overflow-hidden">
         <aside class="w-72 bg-white border-r border-slate-200 flex flex-col z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
             <div class="p-6">
-                <div class="flex items-center gap-3 text-blue-700 font-bold text-xl mb-8">
-                    <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center"><i class="ph ph-brain"></i></div> Desboira't
+                <div class="flex items-center gap-3 font-bold text-2xl mb-8">
+                    <img src="assets/app-logo.png" class="w-10 h-10 drop-shadow-sm">
+                    <span class="bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">Desboira't</span>
                 </div>
                 <nav class="space-y-1">
-                    <div id="nav-patients" onclick="showMainView()" class="flex items-center gap-3 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium cursor-pointer transition">
+                    <div id="nav-patients" onclick="showMainView()" class="flex items-center gap-3 px-3 py-2 bg-teal-50 text-teal-700 rounded-lg font-medium cursor-pointer transition">
                         <i class="ph ph-users-three text-lg"></i> Pacients
                     </div>
                     <div id="nav-qr" onclick="showQRView()" class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-lg font-medium cursor-pointer transition">
@@ -509,44 +492,47 @@ function renderObjectiveView(container) {
                 </nav>
             </div>
             
-            <div class="mt-auto p-4 border-t border-slate-100 flex items-center gap-3">
-                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shadow-md">Dr</div>
-                <div class="flex-1 overflow-hidden">
-                    <p class="text-sm font-bold text-slate-700 truncate" id="doctor-email">...</p>
-                    <button onclick="logout()" class="text-xs text-red-500 hover:underline">Tancar Sessió</button>
+            <div class="mt-auto p-6">
+                 <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-teal-500 to-cyan-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">Dr</div>
+                    <div class="flex-1 overflow-hidden">
+                        <p class="text-sm font-bold text-slate-700 truncate" id="doctor-email">...</p>
+                        <button onclick="logout()" class="text-xs text-red-500 hover:underline font-medium">Tancar Sessió</button>
+                    </div>
                 </div>
+                 <img src="assets/ico-logo.png" alt="ICO Logo" class="w-3/4 mx-auto mt-6">
             </div>
         </aside>
 
         <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
             <header class="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center shadow-sm z-10">
                 <div><h2 class="text-xl font-bold text-slate-800">Panell de Control</h2></div>
-                <div class="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full border border-slate-200">
-                    <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <div class="flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm">
+                    <div class="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></div>
                     <span class="text-xs font-bold text-slate-600"><span id="total-patients">0</span> Pacients Actius</span>
                 </div>
             </header>
             
             <div id="view-main" class="flex-1 flex overflow-hidden">
                 <div class="w-80 bg-white border-r border-slate-200 flex flex-col no-print">
-                    <div class="p-4 border-b border-slate-100 bg-slate-50/50"><input type="text" placeholder="Cercar..." class="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none"></div>
+                    <div class="p-4 border-b border-slate-100 bg-slate-50/50"><input type="text" placeholder="Cercar pacient..." class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-teal-500 transition"></div>
                     <div id="patient-list" class="flex-1 overflow-y-auto"></div>
                 </div>
-                <div class="flex-1 overflow-y-auto p-8 relative">
+                <div class="flex-1 overflow-y-auto p-8 relative font-sans">
                     <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-slate-300">
-                        <i class="ph ph-chart-polar text-6xl mb-4 text-slate-200"></i><p class="font-medium">Selecciona un pacient</p>
+                        <i class="ph ph-chart-polar text-6xl mb-4 text-slate-200"></i><p class="font-medium">Selecciona un pacient de la llista</p>
                     </div>
-                    <div id="patient-stats" class="hidden max-w-4xl mx-auto">
-                        <div class="flex justify-between items-end mb-6 border-b border-slate-200">
+                    <div id="patient-stats" class="hidden max-w-5xl mx-auto fade-in">
+                        <div class="flex justify-between items-end mb-8 border-b border-slate-200 pb-4">
                             <div>
-                                <h2 class="text-3xl font-bold text-slate-800 pb-1" id="selected-patient-name">...</h2>
-                                <button id="btn-notify" onclick="sendNotification()" class="text-xs font-bold bg-amber-100 text-amber-700 px-3 py-1 rounded-full hover:bg-amber-200 transition flex items-center gap-2 mb-3 cursor-pointer">
+                                <button id="btn-notify" onclick="sendNotification()" class="text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100 px-4 py-1.5 rounded-full hover:bg-amber-100 transition flex items-center gap-2 mb-4 cursor-pointer shadow-sm">
                                     <i class="ph ph-bell-ringing"></i> Enviar Recordatori
                                 </button>
+                                <h2 class="text-3xl font-bold text-slate-800" id="selected-patient-name">...</h2>
                             </div>
-                            <div class="flex gap-1">
-                                <button id="btn-objective" onclick="switchTab('objective')" class="pb-3 px-4 active-tab flex items-center gap-2"><i class="ph ph-chart-line-up"></i> Dades Objectives</button>
-                                <button id="btn-subjective" onclick="switchTab('subjective')" class="pb-3 px-4 inactive-tab flex items-center gap-2"><i class="ph ph-clipboard-text"></i> Autoavaluació</button>
+                            <div class="flex gap-2 p-1 bg-slate-100 rounded-lg">
+                                <button id="btn-objective" onclick="switchTab('objective')" class="py-2 px-4 active-tab rounded-md transition flex items-center gap-2 text-sm"><i class="ph ph-chart-line-up"></i> Dades Objectives</button>
+                                <button id="btn-subjective" onclick="switchTab('subjective')" class="py-2 px-4 inactive-tab rounded-md transition flex items-center gap-2 text-sm"><i class="ph ph-clipboard-text"></i> Autoavaluació</button>
                             </div>
                         </div>
                         <div id="dashboard-content"></div>
@@ -554,18 +540,19 @@ function renderObjectiveView(container) {
                 </div>
             </div>
 
-            <div id="view-qr" class="hidden flex-1 flex flex-col items-center justify-center bg-white p-8">
-                <div id="qr-view-content" class="text-center max-w-lg w-full">
-                    <div class="bg-blue-600 text-white p-8 rounded-2xl shadow-xl">
-                        <h2 class="text-3xl font-bold mb-2">Vinculació de Pacients</h2>
-                        <p class="opacity-80 mb-6">Demana al pacient que escanegi aquest codi des de l'App.</p>
-                        <div class="bg-white p-4 rounded-xl inline-block shadow-lg mb-6"><img id="qr-img-big" src="" class="w-64 h-64"></div>
-                        <div class="bg-blue-800/50 p-4 rounded-xl">
-                            <p class="text-xs uppercase tracking-widest opacity-70 mb-1">Codi Manual</p>
-                            <p id="doctor-uid-big" class="text-xl font-mono font-bold tracking-wider select-all">...</p>
-                        </div>
+            <div id="view-qr" class="hidden flex-1 flex flex-col items-center justify-center bg-slate-50 p-8">
+                <div id="qr-view-content" class="text-center max-w-lg w-full bg-white p-10 rounded-3xl shadow-xl border border-slate-100 fade-in">
+                    <div class="mb-8">
+                        <img src="assets/app-logo.png" class="w-16 h-16 mx-auto mb-4 rounded-2xl shadow-md">
+                        <h2 class="text-2xl font-bold text-slate-800 mb-2">Vinculació de Pacients</h2>
+                        <p class="text-slate-500">Demana al pacient que escanegi aquest codi des de l'App.</p>
                     </div>
-                    <button id="btn-print" onclick="printQR()" class="mt-8 bg-slate-800 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 mx-auto hover:bg-slate-700 transition">
+                    <div class="bg-slate-50 p-6 rounded-2xl inline-block shadow-inner border border-slate-100 mb-8"><img id="qr-img-big" src="" class="w-56 h-56 mix-blend-multiply"></div>
+                    <div class="bg-teal-50/50 p-4 rounded-xl border border-teal-100">
+                        <p class="text-xs uppercase tracking-widest text-teal-600 font-semibold mb-1">Codi Manual</p>
+                        <p id="doctor-uid-big" class="text-2xl font-mono font-bold tracking-wider select-all text-teal-800">...</p>
+                    </div>
+                    <button id="btn-print" onclick="printQR()" class="mt-10 bg-slate-800 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 mx-auto hover:bg-slate-700 transition shadow-lg shadow-slate-200">
                         <i class="ph ph-printer text-xl"></i> Imprimir / Guardar PDF
                     </button>
                 </div>
