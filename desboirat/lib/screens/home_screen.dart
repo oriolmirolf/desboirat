@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Import Auth to get the name
 import '../theme/app_colors.dart';
 import '../services/daily_tracker.dart'; 
 import 'games_menu_screen.dart';
@@ -15,11 +16,23 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool _subjectiveDone = false;
   bool _allGamesDone = false; 
+  String _firstName = ""; // Variable to store the name
 
   @override
   void initState() {
     super.initState();
     _checkStatus();
+    _loadUserName(); // Load the name when screen starts
+  }
+
+  // Logic to get the name from Firebase Auth
+  void _loadUserName() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && user.displayName != null && user.displayName!.isNotEmpty) {
+      setState(() {
+        _firstName = user.displayName!.split(' ').first; // Take only the first name
+      });
+    }
   }
 
   void _checkStatus() async {
@@ -59,7 +72,6 @@ class _HomeScreenState extends State<HomeScreen> {
         child: SafeArea(
           child: Stack(
             children: [
-              // The Main Scrollable Content
               SingleChildScrollView(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 20.0),
@@ -67,35 +79,55 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       
-                      // --- CHANGE 2: Logo ABOVE App Name ---
+                      // Logo
                       Container(
                         height: 100, 
                         width: 100,
-                        margin: EdgeInsets.only(bottom: 10), // Add spacing below logo
+                        margin: EdgeInsets.only(bottom: 10), 
                         decoration: BoxDecoration(
                           image: DecorationImage(
-                            // 
-                            image: AssetImage('android/app/src/main/res/drawable/ic_notification.png'), 
+                            // Make sure 'icon.png' is in your pubspec.yaml assets!
+                            image: AssetImage('icon.png'), 
                             fit: BoxFit.contain,
                           ),
                         ),
                       ),
                       
-                      // --- CHANGE 3: App Name moved here ---
+                      // App Name
                       Text(
                         "Desboira't",
                         style: TextStyle(
                           color: AppColors.deepSlate, 
                           fontWeight: FontWeight.bold, 
-                          fontSize: 32 // Increased size slightly for header
+                          fontSize: 32 
                         ),
                       ),
                       
                       SizedBox(height: 5),
-                      Text(
-                        "Benvingut de nou",
-                        style: TextStyle(fontSize: 18, color: AppColors.deepSlate.withOpacity(0.7)),
+                      
+// --- 4. UPDATED WELCOME TEXT ---
+                      Text.rich(
+                        TextSpan(
+                          // Base style (Normal, color DeepSlate)
+                          text: "Benvingut de nou",
+                          style: TextStyle(
+                            fontSize: 18, 
+                            color: AppColors.deepSlate.withOpacity(0.7),
+                          ),
+                          children: [
+                            // Only add comma and bold name if the name exists
+                            if (_firstName.isNotEmpty) ...[
+                              const TextSpan(text: ", "),
+                              TextSpan(
+                                text: _firstName,
+                                // Override to make ONLY the name bold
+                                style: const TextStyle(fontWeight: FontWeight.bold), 
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
+                      
                       SizedBox(height: 40),
 
                       // 1. GAMES MENU
@@ -157,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   opacity: 0.8, 
                   child: Image.asset(
                     'web/icons/logo.png', 
-                    width: 100, // Slightly smaller looks cleaner when centered
+                    width: 100, 
                     height: 100,
                   ),
                 ),

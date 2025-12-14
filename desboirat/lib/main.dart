@@ -11,8 +11,6 @@ import 'screens/qr_link_screen.dart';
 import 'services/database_service.dart';
 import 'services/notification_service.dart'; 
 
-// (Note: No global boolean variables here anymore)
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -37,10 +35,7 @@ Future<void> main() async {
              Timestamp ts = data['timestamp'];
              // Only allow recent triggers (last 2 mins)
              if (DateTime.now().difference(ts.toDate()).inSeconds < 120) {
-                 
                  print("🔔 TRIGGER RECEIVED: Sending Notification");
-
-                 // 🔴 ALWAYS SEND "COM ET SENTS?" (No if/else logic needed)
                  NotificationService().showInstantNotification(
                    999, 
                    "Com et sents?", 
@@ -78,30 +73,59 @@ class DesboiratApp extends StatelessWidget {
   }
 }
 
-class AuthGate extends StatefulWidget {
-  @override
-  _AuthGateState createState() => _AuthGateState();
-}
-
-class _AuthGateState extends State<AuthGate> {
-  Key _key = UniqueKey(); 
-
+// 🟢 THE FINAL FIX: STREAM AUTH GATE WITH LOADING GUARDS 🟢
+class AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return LoginScreen();
+      builder: (context, authSnapshot) {
+        // 1. Auth Loading? -> Spinner
+        if (authSnapshot.connectionState == ConnectionState.waiting) {
+           return Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.teal)));
+        }
 
-        return FutureBuilder<bool>(
-          key: _key, 
-          future: DatabaseService().isLinkedToDoctor(),
-          builder: (context, linkSnapshot) {
-            if (linkSnapshot.connectionState == ConnectionState.waiting) {
-              return Scaffold(body: Center(child: CircularProgressIndicator()));
+        // 2. Not Logged In? -> Login
+        if (!authSnapshot.hasData) {
+          return LoginScreen();
+        }
+
+        // 3. Logged In -> Check Database Profile LIVE
+        User user = authSnapshot.data!;
+        
+        return StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+          builder: (context, userSnapshot) {
+            
+            // 🔴 CRITICAL FIX: PREVENT FLASHING & LOOPS 🔴
+            
+            // If connection is opening, or data hasn't arrived, or doc doesn't exist yet...
+            // SHOW SPINNER. Do NOT show QR screen yet.
+            if (userSnapshot.connectionState == ConnectionState.waiting || 
+                !userSnapshot.hasData || 
+                !userSnapshot.data!.exists) {
+              return Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.teal)));
             }
-            bool isLinked = linkSnapshot.data ?? false;
-            return isLinked ? HomeScreen() : QRLinkScreen(onLinked: () => setState(() => _key = UniqueKey()));
+
+            // Extract Data
+            var userData = userSnapshot.data!.data() as Map<String, dynamic>?;
+
+            if (userData == null) {
+              // Still waiting for real data...
+              return Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.teal)));
+            }
+
+            // 🟢 NOW we are 100% sure we have the data. Check logic.
+            bool hasDoctor = userData.containsKey('doctorId') && 
+                             userData['doctorId'] != null && 
+                             userData['doctorId'] != "";
+
+            if (hasDoctor) {
+              return HomeScreen();
+            } else {
+              // Only show QR if we are SURE there is no doctor ID
+              return QRLinkScreen(onLinked: () {}); 
+            }
           },
         );
       },

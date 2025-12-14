@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -14,124 +16,237 @@ class _LoginScreenState extends State<LoginScreen> {
   String _errorMessage = "";
   bool _isLoading = false;
 
-  // --- GOOGLE SIGN IN LOGIC ---
+  // --- SAVE USER DATA ---
+  Future<void> _saveUserToFirestore(User user) async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'email': user.email,
+        'displayName': user.displayName ?? user.email?.split('@')[0],
+        'last_login': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print("Error saving to Firestore: $e");
+    }
+  }
+
+  // --- GOOGLE SIGN IN ---
   Future<void> _signInWithGoogle() async {
     setState(() { _isLoading = true; _errorMessage = ""; });
-    print("Attempting Google Sign In..."); // DEBUG LOG
-    
     try {
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      
       if (googleUser == null) {
-        print("Google Sign In canceled by user.");
         setState(() => _isLoading = false);
         return;
       }
-
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       final OAuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      print("Google credentials obtained. Signing into Firebase...");
-      await _auth.signInWithCredential(credential);
-      print("Google Sign In Successful!");
-      
+      UserCredential userCredential = await _auth.signInWithCredential(credential);
+      if (userCredential.user != null) {
+        await _saveUserToFirestore(userCredential.user!);
+      }
     } catch (e) {
-      print("Google Error: $e");
       setState(() => _errorMessage = "Error Google: $e");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  // --- EMAIL SIGN IN ---
   Future<void> _submit(bool isRegister) async {
     setState(() { _isLoading = true; _errorMessage = ""; });
-    print("Attempting Email Auth (Register: $isRegister)..."); // DEBUG LOG
-
     try {
+      UserCredential userCredential;
       if (isRegister) {
-        await _auth.createUserWithEmailAndPassword(
+        userCredential = await _auth.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passController.text.trim(),
         );
       } else {
-        await _auth.signInWithEmailAndPassword(
+        userCredential = await _auth.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passController.text.trim(),
         );
       }
-      print("Email Auth Successful!");
+      if (userCredential.user != null) {
+        await _saveUserToFirestore(userCredential.user!);
+      }
     } on FirebaseAuthException catch (e) {
-      print("Firebase Auth Error: ${e.code} - ${e.message}");
       setState(() => _errorMessage = e.message ?? "Error desconegut");
     } catch (e) {
-      print("General Error: $e");
       setState(() => _errorMessage = e.toString());
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  final InputBorder _defaultBorder = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12),
+    borderSide: BorderSide(color: Colors.blueGrey.shade100),
+  );
+  
+  final InputBorder _focusedBorder = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12),
+    borderSide: BorderSide(color: Colors.teal, width: 2),
+  );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text("Desboira't", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.blue)),
-                SizedBox(height: 10),
-                Text("Accés Pacients", style: TextStyle(fontSize: 18, color: Colors.grey)),
-                SizedBox(height: 40),
-                
-                TextField(
-                  controller: _emailController,
-                  decoration: InputDecoration(labelText: "Correu Electrònic", border: OutlineInputBorder()),
+      backgroundColor: Color(0xFFF8FAFC), 
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                constraints: BoxConstraints(maxWidth: 400),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: Offset(0, 4)),
+                  ],
                 ),
-                SizedBox(height: 10),
-                TextField(
-                  controller: _passController,
-                  decoration: InputDecoration(labelText: "Contrasenya", border: OutlineInputBorder()),
-                  obscureText: true,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Column(
+                    children: [
+                      Container(
+                        height: 8,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [Colors.teal.shade400, Colors.cyan.shade500]),
+                        ),
+                      ),
+                      
+                      Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Column(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.teal.withOpacity(0.2), blurRadius: 15, offset: Offset(0, 8)),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                // 🟢 1. YOUR APP ICON (From root assets)
+                                child: Image.asset('icon.png', width: 80, height: 80),
+                              ),
+                            ),
+                            
+                            SizedBox(height: 20),
+                            Text("Desboira't", style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.blueGrey.shade800)),
+                            Text("Accés Pacients", style: GoogleFonts.plusJakartaSans(fontSize: 14, color: Colors.blueGrey.shade400)),
+                            SizedBox(height: 30),
+
+                            TextField(
+                              controller: _emailController,
+                              style: GoogleFonts.plusJakartaSans(fontSize: 14),
+                              decoration: InputDecoration(
+                                labelText: "Correu Electrònic",
+                                filled: true, fillColor: Colors.white,
+                                border: _defaultBorder, enabledBorder: _defaultBorder, focusedBorder: _focusedBorder,
+                                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                            TextField(
+                              controller: _passController,
+                              obscureText: true,
+                              style: GoogleFonts.plusJakartaSans(fontSize: 14),
+                              decoration: InputDecoration(
+                                labelText: "Contrasenya",
+                                filled: true, fillColor: Colors.white,
+                                border: _defaultBorder, enabledBorder: _defaultBorder, focusedBorder: _focusedBorder,
+                                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              ),
+                            ),
+
+                            SizedBox(height: 24),
+                            
+                            if (_errorMessage.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 16.0),
+                                child: Text(_errorMessage, style: TextStyle(color: Colors.red, fontSize: 12)),
+                              ),
+
+                            // Loading State
+                            if (_isLoading)
+                              CircularProgressIndicator(color: Colors.teal),
+
+                            // Buttons
+                            if (!_isLoading) ...[
+                              Container(
+                                width: double.infinity,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(colors: [Colors.teal, Colors.cyan.shade600]),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [BoxShadow(color: Colors.teal.withOpacity(0.3), blurRadius: 10, offset: Offset(0, 4))],
+                                ),
+                                child: ElevatedButton(
+                                  onPressed: () => _submit(false),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent, shadowColor: Colors.transparent,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  child: Text("INICIAR SESSIÓ", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: Colors.white)),
+                                ),
+                              ),
+                              SizedBox(height: 12),
+                              
+                              OutlinedButton.icon(
+                                onPressed: _signInWithGoogle,
+                                icon: Image.network(
+                                  "https://cdn-icons-png.flaticon.com/512/300/300221.png", 
+                                  width: 24, 
+                                  height: 24
+                                ),
+                                label: Text("Entrar amb Google", style: GoogleFonts.plusJakartaSans(color: Colors.blueGrey.shade700, fontWeight: FontWeight.w600)),
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: Colors.white, side: BorderSide(color: Colors.blueGrey.shade200),
+                                  padding: EdgeInsets.symmetric(vertical: 14),
+                                  minimumSize: Size(double.infinity, 50),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                              SizedBox(height: 20),
+                              GestureDetector(
+                                onTap: () => _submit(true),
+                                child: Text("No tens compte? Registra't", style: GoogleFonts.plusJakartaSans(color: Colors.teal.shade600, fontWeight: FontWeight.w600, fontSize: 13)),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      
+                      // Footer
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.blueGrey.shade50))),
+                        child: Center(
+                          // 🟢 2. YOUR ICO LOGO (From web/icons folder)
+                          child: Image.asset(
+                            'web/icons/logo.png', 
+                            height: 30,
+                            errorBuilder: (context, error, stackTrace) => Text("ICO Logo", style: TextStyle(color: Colors.grey)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                
-                SizedBox(height: 20),
-                if (_errorMessage.isNotEmpty)
-                  Text(_errorMessage, style: TextStyle(color: Colors.red)),
-                  
-                if (_isLoading) 
-                  CircularProgressIndicator()
-                else ...[
-                  ElevatedButton(
-                    onPressed: () => _submit(false), 
-                    child: Container(width: double.infinity, alignment: Alignment.center, child: Text("INICIAR SESSIÓ")),
-                  ),
-                  SizedBox(height: 10),
-                  
-                  // --- THE GOOGLE BUTTON ---
-                  OutlinedButton.icon(
-                    onPressed: _signInWithGoogle,
-                    icon: Icon(Icons.login, color: Colors.red), 
-                    label: Text("Entrar amb Google"),
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      minimumSize: Size(double.infinity, 50),
-                    ),
-                  ),
-                  
-                  SizedBox(height: 10),
-                  TextButton(
-                    onPressed: () => _submit(true), 
-                    child: Text("No tens compte? Registra't"),
-                  ),
-                ]
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
