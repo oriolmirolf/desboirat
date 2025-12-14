@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../services/daily_tracker.dart'; 
 import 'games_menu_screen.dart';
@@ -44,6 +45,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent, // Make the background transparent
+      statusBarIconBrightness: Brightness.dark, // Use 'dark' icons (black) for light background
+      // statusBarIconBrightness: Brightness.light, // Use this if your background is dark
+    ));
     return Scaffold(
       extendBodyBehindAppBar: true, 
       body: Container(
