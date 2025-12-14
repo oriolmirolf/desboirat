@@ -46,84 +46,117 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true, 
-      appBar: AppBar(
-        title: Text(
-          "Desboira't", 
-          style: TextStyle(color: AppColors.deepSlate, fontWeight: FontWeight.bold, fontSize: 24)
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent, 
-        elevation: 0, 
-      ),
       body: Container(
         width: double.infinity,
         height: double.infinity, 
         decoration: BoxDecoration(gradient: AppColors.mainGradient),
         child: SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 20.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.spa, size: 80, color: AppColors.deepSlate.withOpacity(0.5)),
-                  SizedBox(height: 10),
-                  Text(
-                    "Benvingut de nou",
-                    style: TextStyle(fontSize: 18, color: AppColors.deepSlate.withOpacity(0.7)),
-                  ),
-                  SizedBox(height: 40),
+          child: Stack(
+            children: [
+              // The Main Scrollable Content
+              SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 20.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      
+                      // --- CHANGE 2: Logo ABOVE App Name ---
+                      Container(
+                        height: 100, 
+                        width: 100,
+                        margin: EdgeInsets.only(bottom: 10), // Add spacing below logo
+                        decoration: BoxDecoration(
+                          image: DecorationImage(
+                            // 
+                            image: AssetImage('android/app/src/main/res/drawable/ic_notification.png'), 
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                      
+                      // --- CHANGE 3: App Name moved here ---
+                      Text(
+                        "Desboira't",
+                        style: TextStyle(
+                          color: AppColors.deepSlate, 
+                          fontWeight: FontWeight.bold, 
+                          fontSize: 32 // Increased size slightly for header
+                        ),
+                      ),
+                      
+                      SizedBox(height: 5),
+                      Text(
+                        "Benvingut de nou",
+                        style: TextStyle(fontSize: 18, color: AppColors.deepSlate.withOpacity(0.7)),
+                      ),
+                      SizedBox(height: 40),
 
-                  // 1. GAMES MENU
-                  _buildMainButton(
-                    context, 
-                    "Entrenament Cognitiu", 
-                    _allGamesDone ? "Sessió completada!" : "Accedeix als 4 jocs mentals",
-                    Icons.extension, 
-                    _allGamesDone, 
-                    () => _navigateAndRefresh(GamesMenuScreen()),
-                  ),
-                  
-                  SizedBox(height: 20),
+                      // 1. GAMES MENU
+                      _buildMainButton(
+                        context, 
+                        "Entrenament Cognitiu", 
+                        _allGamesDone ? "Sessió completada!" : "Accedeix als 4 jocs mentals",
+                        Icons.extension, 
+                        _allGamesDone, 
+                        () => _navigateAndRefresh(GamesMenuScreen()),
+                      ),
+                      
+                      SizedBox(height: 20),
 
-                  // 2. AUTO-EVALUATION
-                  _buildMainButton(
-                    context, 
-                    "Autoavaluació", 
-                    _subjectiveDone ? "Registrat per avui" : "Registre diari de símptomes",
-                    Icons.assignment_ind, 
-                    _subjectiveDone, 
-                    () => _navigateAndRefresh(SubjectiveTestScreen()),
-                  ),
-                  
-                  SizedBox(height: 20),
+                      // 2. AUTO-EVALUATION
+                      _buildMainButton(
+                        context, 
+                        "Autoavaluació", 
+                        _subjectiveDone ? "Registrat per avui" : "Registre diari de símptomes",
+                        Icons.assignment_ind, 
+                        _subjectiveDone, 
+                        () => _navigateAndRefresh(SubjectiveTestScreen()),
+                      ),
+                      
+                      SizedBox(height: 20),
 
-                  // 3. HELP & TIPS
-                  _buildMainButton(
-                    context, 
-                    "Recomanacions", 
-                    "Consells i vídeos personalitzats",
-                    Icons.tips_and_updates, 
-                    false, 
-                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpRecommendationsScreen())),
-                  ),
+                      // 3. HELP & TIPS
+                      _buildMainButton(
+                        context, 
+                        "Recomanacions", 
+                        "Consells i vídeos personalitzats",
+                        Icons.tips_and_updates, 
+                        false, 
+                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpRecommendationsScreen())),
+                      ),
 
-                  SizedBox(height: 20),
+                      SizedBox(height: 20),
 
-                  // 4. VIRTUAL ASSISTANT
-                  _buildMainButton(
-                    context, 
-                    "Assistent Virtual", 
-                    "Xat amb Desboira't",
-                    Icons.smart_toy, 
-                    false, 
-                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatBotScreen())),
+                      // 4. VIRTUAL ASSISTANT
+                      _buildMainButton(
+                        context, 
+                        "Assistent Virtual", 
+                        "Xat amb Desboira't",
+                        Icons.smart_toy, 
+                        false, 
+                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatBotScreen())),
+                      ),
+                      
+                      SizedBox(height: 60), 
+                    ],
                   ),
-                  
-                  SizedBox(height: 40),
-                ],
+                ),
               ),
-            ),
+
+              // Bottom Corner Logo
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Opacity(
+                  opacity: 0.8, 
+                  child: Image.asset(
+                    'web/icons/logo.png', 
+                    width: 100, // Slightly smaller looks cleaner when centered
+                    height: 100,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -131,14 +164,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMainButton(BuildContext ctx, String title, String subtitle, IconData icon, bool isDone, VoidCallback onTap) {
-    // DARKER SHADING FOR COMPLETED STATE
-    // Background: Stronger Green (Green-200 equivalent)
     final bgColor = isDone ? const Color(0xFFBBF7D0) : AppColors.cream; 
-    // Text: Dark Green
     final textColor = isDone ? const Color(0xFF14532D) : AppColors.deepSlate; 
-    // Icon Circle: Medium Green
     final iconBgColor = isDone ? const Color(0xFF86EFAC) : AppColors.skyBlue.withOpacity(0.2);
-    // Icon: Dark Green
     final iconColor = isDone ? const Color(0xFF14532D) : AppColors.deepSlate;
 
     return Container(
@@ -189,7 +217,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     subtitle, 
                     style: TextStyle(
                       fontSize: 14, 
-                      // If done, text is darker green to match theme, else slate
                       color: isDone ? textColor.withOpacity(0.9) : textColor.withOpacity(0.6)
                     )
                   ),
