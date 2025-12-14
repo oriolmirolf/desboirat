@@ -63,6 +63,7 @@
         let currentTab = 'objective'; 
         let objChartInstance = null;
         let subjChartInstance = null;
+        let subjLineChartInstance = null; // New variable for the line plot
         let doctorUid = "";
         let currentPatientId = "";
 
@@ -166,7 +167,7 @@
             document.getElementById('doctor-uid-big').innerText = uid;
         }
 
-        // --- LOAD PATIENTS ---
+        // --- LOAD PATIENTS (REMOVED ID DISPLAY) ---
         function loadPatients(doctorId) {
             const q = query(collection(db, "users"), where("doctorId", "==", doctorId));
             onSnapshot(q, (snapshot) => {
@@ -176,22 +177,20 @@
 
                 snapshot.forEach(doc => {
                     const data = doc.data();
-                    // 🟢 DEBUGGING NAMES: Open Console (F12) to see what's in the DB
-                    console.log("Patient Data from DB:", data);
-
                     const patientName = data.displayName || data.email || 'Sense Nom';
                     const initial = patientName.charAt(0).toUpperCase();
 
                     const el = document.createElement('div');
                     el.className = "group p-4 border-b border-slate-100 hover:bg-teal-50 cursor-pointer transition flex items-center gap-3";
                     el.onclick = () => loadPatientDetails(doc.id, patientName);
+                    
+                    // 🟢 CHANGE: Removed the ID line below the name
                     el.innerHTML = `
                         <div class="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold group-hover:bg-teal-200 group-hover:text-teal-800 transition">
                             ${initial}
                         </div>
                         <div class="flex-1">
                             <p class="font-semibold text-slate-700 group-hover:text-teal-900 truncate">${patientName}</p>
-                            <p class="text-xs text-slate-400 font-mono">ID: ${doc.id.slice(0,6)}...</p>
                         </div>
                         <i class="ph ph-caret-right text-slate-300 group-hover:text-teal-500"></i>
                     `;
@@ -325,6 +324,7 @@
             renderHistoryList(container, objectiveData);
         }
 
+        // 🟢 UPDATED SUBJECTIVE VIEW: SIDE BY SIDE RADAR + TEXT, LINE PLOT BELOW 🟢
         function renderSubjectiveView(container) {
             const subjectiveData = allPatientResults.filter(d => d.testName === 'qüestionari_subjectiu');
             
@@ -333,6 +333,7 @@
                 return;
             }
 
+            // --- 1. DATA PROCESSING FOR RADAR (Last 7 Days) ---
             const now = new Date();
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(now.getDate() - 7);
@@ -359,12 +360,13 @@
 
             const avgScores = domainSums.map((sum, i) => domainCounts[i] > 0 ? (sum / domainCounts[i]).toFixed(1) : 0);
             
-            const chartRow = document.createElement('div');
-            chartRow.className = "grid grid-cols-2 gap-6 mb-6 fade-in";
+            // --- 2. LAYOUT: Top Grid (Radar + Text) ---
+            const topRow = document.createElement('div');
+            topRow.className = "grid grid-cols-2 gap-6 mb-6 fade-in";
             
-            const chartCard = document.createElement('div');
-            chartCard.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm h-80 relative";
-            chartCard.innerHTML = '<canvas id="subjChart"></canvas>';
+            const radarCard = document.createElement('div');
+            radarCard.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm h-80 relative";
+            radarCard.innerHTML = '<canvas id="subjChart"></canvas>';
             
             const textCard = document.createElement('div');
             textCard.className = "bg-teal-50 p-6 rounded-xl border border-teal-100 flex flex-col justify-center";
@@ -380,15 +382,21 @@
                 </div>
             `;
 
-            chartRow.appendChild(chartCard);
-            chartRow.appendChild(textCard);
-            container.appendChild(chartRow);
+            topRow.appendChild(radarCard);
+            topRow.appendChild(textCard);
+            container.appendChild(topRow);
+
+            // --- 3. LAYOUT: Bottom Row (Evolution Line Chart) ---
+            const lineChartCard = document.createElement('div');
+            lineChartCard.className = "bg-white p-4 rounded-xl border border-slate-200 mb-6 shadow-sm fade-in h-80 relative";
+            lineChartCard.innerHTML = '<canvas id="subjLineChart"></canvas>';
+            container.appendChild(lineChartCard);
 
             setTimeout(() => {
+                // --- RENDER RADAR CHART ---
                 if (subjChartInstance) subjChartInstance.destroy();
-                
-                const ctx = document.getElementById('subjChart').getContext('2d');
-                subjChartInstance = new Chart(ctx, {
+                const ctxRadar = document.getElementById('subjChart').getContext('2d');
+                subjChartInstance = new Chart(ctxRadar, {
                     type: 'radar',
                     data: {
                         labels: domains,
@@ -403,6 +411,64 @@
                     },
                     options: { responsive: true, maintainAspectRatio: false, scales: { r: { suggestedMin: 0, suggestedMax: 4 } } }
                 });
+
+                // --- DATA PROCESSING FOR LINE CHART (Evolution) ---
+                // We need to process ALL subjective data, sorted by date
+                const sortedHistory = [...subjectiveData].sort((a,b) => a.timestamp.seconds - b.timestamp.seconds);
+                const dates = [];
+                // 5 arrays for the 5 domains
+                const historySeries = [[], [], [], [], []]; 
+
+                sortedHistory.forEach(doc => {
+                    const dateStr = new Date(doc.timestamp.seconds * 1000).toLocaleDateString();
+                    dates.push(dateStr);
+
+                    let localSums = [0,0,0,0,0];
+                    let localCounts = [0,0,0,0,0];
+
+                    if(doc.answers_map) {
+                        Object.keys(doc.answers_map).forEach(qKey => {
+                            const qIdx = parseInt(qKey);
+                            const val = doc.answers_map[qKey];
+                            const domainIdx = questionToDomain[qIdx];
+                            if(domainIdx !== undefined) {
+                                localSums[domainIdx] += val;
+                                localCounts[domainIdx]++;
+                            }
+                        });
+                    }
+                    // Calculate avg for this specific day/test
+                    for(let i=0; i<5; i++) {
+                         const val = localCounts[i] > 0 ? (localSums[i] / localCounts[i]) : 0;
+                         historySeries[i].push(val);
+                    }
+                });
+
+                // --- RENDER LINE CHART ---
+                if (subjLineChartInstance) subjLineChartInstance.destroy();
+                const ctxLine = document.getElementById('subjLineChart').getContext('2d');
+                subjLineChartInstance = new Chart(ctxLine, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [
+                            { label: 'Atenció', data: historySeries[0], borderColor: '#0d9488', tension: 0.3, pointRadius: 3 }, // Teal
+                            { label: 'Velocitat', data: historySeries[1], borderColor: '#d97706', tension: 0.3, pointRadius: 3 }, // Amber
+                            { label: 'Fluència', data: historySeries[2], borderColor: '#0891b2', tension: 0.3, pointRadius: 3 }, // Cyan
+                            { label: 'Memòria', data: historySeries[3], borderColor: '#0284c7', tension: 0.3, pointRadius: 3 }, // Sky
+                            { label: 'Func. Exec.', data: historySeries[4], borderColor: '#7c3aed', tension: 0.3, pointRadius: 3 } // Violet
+                        ]
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { 
+                            title: { display: true, text: 'Evolució dels Símptomes (0=Bé, 4=Malament)' } 
+                        },
+                        scales: { y: { min: 0, max: 4 } }
+                    }
+                });
+
             }, 50);
 
             renderHistoryList(container, subjectiveData);
