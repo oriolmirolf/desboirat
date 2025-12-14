@@ -63,7 +63,7 @@
         let currentTab = 'objective'; 
         let objChartInstance = null;
         let subjChartInstance = null;
-        let subjLineChartInstance = null; // New variable for the line plot
+        let subjLineChartInstance = null; 
         let doctorUid = "";
         let currentPatientId = "";
 
@@ -167,7 +167,7 @@
             document.getElementById('doctor-uid-big').innerText = uid;
         }
 
-        // --- LOAD PATIENTS (REMOVED ID DISPLAY) ---
+        // --- LOAD PATIENTS ---
         function loadPatients(doctorId) {
             const q = query(collection(db, "users"), where("doctorId", "==", doctorId));
             onSnapshot(q, (snapshot) => {
@@ -184,7 +184,6 @@
                     el.className = "group p-4 border-b border-slate-100 hover:bg-teal-50 cursor-pointer transition flex items-center gap-3";
                     el.onclick = () => loadPatientDetails(doc.id, patientName);
                     
-                    // 🟢 CHANGE: Removed the ID line below the name
                     el.innerHTML = `
                         <div class="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold group-hover:bg-teal-200 group-hover:text-teal-800 transition">
                             ${initial}
@@ -239,7 +238,12 @@
         // --- RENDERERS ---
 
         function renderObjectiveView(container) {
-            const objectiveData = allPatientResults.filter(d => d.testName !== 'qüestionari_subjectiu');
+            // Filter out missing timestamps to prevent "Invalid Date" errors
+            const objectiveData = allPatientResults.filter(d => 
+                d.testName !== 'qüestionari_subjectiu' && 
+                d.timestamp && 
+                d.timestamp.seconds
+            );
             
             const topStats = document.createElement('div');
             topStats.className = "grid grid-cols-4 gap-4 mb-6 fade-in";
@@ -284,7 +288,8 @@
                 if (objChartInstance) objChartInstance.destroy();
                 const ctx = document.getElementById('objChart').getContext('2d');
                 
-                const ascData = [...objectiveData].reverse();
+                // Safe Sort
+                const ascData = [...objectiveData].sort((a,b) => a.timestamp.seconds - b.timestamp.seconds);
                 const uniqueDatesMap = new Map();
                 
                 ascData.forEach(d => {
@@ -324,20 +329,26 @@
             renderHistoryList(container, objectiveData);
         }
 
-        // 🟢 UPDATED SUBJECTIVE VIEW: SIDE BY SIDE RADAR + TEXT, LINE PLOT BELOW 🟢
+        // 🟢 UPDATED SUBJECTIVE VIEW WITH SAFE DATE PARSING 🟢
         function renderSubjectiveView(container) {
-            const subjectiveData = allPatientResults.filter(d => d.testName === 'qüestionari_subjectiu');
+            // Filter out bad data to avoid crashes
+            const subjectiveData = allPatientResults.filter(d => 
+                d.testName === 'qüestionari_subjectiu' && 
+                d.timestamp && 
+                d.timestamp.seconds
+            );
             
             if(subjectiveData.length === 0) {
                 container.innerHTML = `<div class="p-10 text-center text-slate-400 fade-in">El pacient no ha realitzat cap autoavaluació.</div>`;
                 return;
             }
 
-            // --- 1. DATA PROCESSING FOR RADAR (Last 7 Days) ---
+            // --- 1. RADAR CHART DATA (Last 7 Days) ---
             const now = new Date();
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(now.getDate() - 7);
 
+            // Filter recent docs
             const recentDocs = subjectiveData.filter(d => new Date(d.timestamp.seconds * 1000) >= sevenDaysAgo);
             const domains = ["Atenció", "Velocitat Proc.", "Fluència Verbal", "Memòria", "Funcions Exec."];
             const questionToDomain = [0, 1, 2, 0, 3, 3, 4, 4];
@@ -358,9 +369,10 @@
                 }
             });
 
+            // Calculate Average based on ACTUAL counts (handles n < 7 correctly)
             const avgScores = domainSums.map((sum, i) => domainCounts[i] > 0 ? (sum / domainCounts[i]).toFixed(1) : 0);
             
-            // --- 2. LAYOUT: Top Grid (Radar + Text) ---
+            // --- 2. LAYOUT ---
             const topRow = document.createElement('div');
             topRow.className = "grid grid-cols-2 gap-6 mb-6 fade-in";
             
@@ -386,14 +398,13 @@
             topRow.appendChild(textCard);
             container.appendChild(topRow);
 
-            // --- 3. LAYOUT: Bottom Row (Evolution Line Chart) ---
             const lineChartCard = document.createElement('div');
             lineChartCard.className = "bg-white p-4 rounded-xl border border-slate-200 mb-6 shadow-sm fade-in h-80 relative";
             lineChartCard.innerHTML = '<canvas id="subjLineChart"></canvas>';
             container.appendChild(lineChartCard);
 
             setTimeout(() => {
-                // --- RENDER RADAR CHART ---
+                // RADAR
                 if (subjChartInstance) subjChartInstance.destroy();
                 const ctxRadar = document.getElementById('subjChart').getContext('2d');
                 subjChartInstance = new Chart(ctxRadar, {
@@ -401,7 +412,7 @@
                     data: {
                         labels: domains,
                         datasets: [{
-                            label: 'Símptomes (Mitjana 7 dies)',
+                            label: 'Símptomes',
                             data: avgScores,
                             fill: true,
                             backgroundColor: 'rgba(13, 148, 136, 0.2)', 
@@ -412,11 +423,13 @@
                     options: { responsive: true, maintainAspectRatio: false, scales: { r: { suggestedMin: 0, suggestedMax: 4 } } }
                 });
 
-                // --- DATA PROCESSING FOR LINE CHART (Evolution) ---
-                // We need to process ALL subjective data, sorted by date
-                const sortedHistory = [...subjectiveData].sort((a,b) => a.timestamp.seconds - b.timestamp.seconds);
+                // LINE CHART (Evolution)
+                // Filter and Sort Safely
+                const sortedHistory = [...subjectiveData]
+                    .filter(d => d.timestamp && d.timestamp.seconds)
+                    .sort((a,b) => a.timestamp.seconds - b.timestamp.seconds);
+                    
                 const dates = [];
-                // 5 arrays for the 5 domains
                 const historySeries = [[], [], [], [], []]; 
 
                 sortedHistory.forEach(doc => {
@@ -437,14 +450,12 @@
                             }
                         });
                     }
-                    // Calculate avg for this specific day/test
                     for(let i=0; i<5; i++) {
                          const val = localCounts[i] > 0 ? (localSums[i] / localCounts[i]) : 0;
                          historySeries[i].push(val);
                     }
                 });
 
-                // --- RENDER LINE CHART ---
                 if (subjLineChartInstance) subjLineChartInstance.destroy();
                 const ctxLine = document.getElementById('subjLineChart').getContext('2d');
                 subjLineChartInstance = new Chart(ctxLine, {
@@ -452,11 +463,11 @@
                     data: {
                         labels: dates,
                         datasets: [
-                            { label: 'Atenció', data: historySeries[0], borderColor: '#0d9488', tension: 0.3, pointRadius: 3 }, // Teal
-                            { label: 'Velocitat', data: historySeries[1], borderColor: '#d97706', tension: 0.3, pointRadius: 3 }, // Amber
-                            { label: 'Fluència', data: historySeries[2], borderColor: '#0891b2', tension: 0.3, pointRadius: 3 }, // Cyan
-                            { label: 'Memòria', data: historySeries[3], borderColor: '#0284c7', tension: 0.3, pointRadius: 3 }, // Sky
-                            { label: 'Func. Exec.', data: historySeries[4], borderColor: '#7c3aed', tension: 0.3, pointRadius: 3 } // Violet
+                            { label: 'Atenció', data: historySeries[0], borderColor: '#0d9488', tension: 0.3, pointRadius: 3 }, 
+                            { label: 'Velocitat', data: historySeries[1], borderColor: '#d97706', tension: 0.3, pointRadius: 3 },
+                            { label: 'Fluència', data: historySeries[2], borderColor: '#0891b2', tension: 0.3, pointRadius: 3 },
+                            { label: 'Memòria', data: historySeries[3], borderColor: '#0284c7', tension: 0.3, pointRadius: 3 },
+                            { label: 'Func. Exec.', data: historySeries[4], borderColor: '#7c3aed', tension: 0.3, pointRadius: 3 }
                         ]
                     },
                     options: { 
@@ -491,7 +502,9 @@
                     row.className = "flex items-center justify-between p-4 border-b border-slate-100 hover:bg-teal-50 transition last:border-0";
                     
                     let icon, color, title, val;
-                    const date = new Date(d.timestamp.seconds * 1000).toLocaleDateString();
+                    // Safe date check
+                    const ts = d.timestamp && d.timestamp.seconds ? d.timestamp.seconds : Date.now()/1000;
+                    const date = new Date(ts * 1000).toLocaleDateString();
 
                     if(d.testName === 'fluencia_verbal') { icon="microphone"; color="text-cyan-700 bg-cyan-100"; title="Fluència Verbal"; val=`${d.score} paraules`; }
                     else if(d.testName === 'memoria_treball') { icon="brain"; color="text-sky-700 bg-sky-100"; title="Memòria Treball (Invers)"; val=`${d.score} dígits`; }
@@ -516,7 +529,7 @@
         }
     </script>
 
-    <div id="login-screen" class="flex-1 flex flex-col items-center justify-center bg-slate-50 fade-in p-4">
+    <div id="login-screen" class="flex-1 flex flex-col items-center justify-center bg-slate-50 fade-in p-4 overflow-y-auto w-full">
         <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm border border-slate-100 relative overflow-hidden">
             <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-teal-400 to-cyan-500"></div>
             
@@ -533,9 +546,21 @@
             <button onclick="loginGoogle()" class="w-full mt-3 bg-white border border-slate-200 text-slate-700 font-semibold py-3.5 rounded-xl hover:bg-slate-50 flex items-center justify-center gap-2 transition">
                 <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5"> Entrar amb Google
             </button>
-            <div class="mt-6 text-center"><button onclick="register()" class="text-xs text-teal-600 font-semibold hover:underline">Registrar nou compte</button></div>
+            <div class="mt-6 flex flex-wrap justify-center items-center gap-3 text-xs font-semibold">
+                <button onclick="register()" class="text-teal-600 hover:underline">
+                    Registrar nou compte
+                </button>
+                
+                <span class="text-slate-300">|</span>
+                
+                <button onclick="window.location.href='https://drive.google.com/uc?export=download&id=1MhG2N9eSadmhSATPTlye-zrfd1x34QBd'" 
+                        class="text-slate-500 hover:text-teal-600 flex items-center gap-1.5 transition">
+                    <i class="ph ph-android-logo text-sm"></i>
+                    <span>Descarregar App</span>
+                </button>
+            </div>
 
-             <div class="mt-8 pt-6 border-t border-slate-100 flex justify-center">
+            <div class="mt-6 pt-4 border-t border-slate-100 flex justify-center">
                 <img src="assets/ico-logo.png" alt="ICO Logo" class="h-10 transition">
             </div>
         </div>
