@@ -63,6 +63,7 @@ class DesboiratApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: "Desboira't",
       theme: ThemeData(
         primarySwatch: Colors.blue,

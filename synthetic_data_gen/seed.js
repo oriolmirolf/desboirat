@@ -55,9 +55,10 @@ const generateData = async () => {
         const uid = `demo_${p.name.split(' ')[0].toLowerCase()}`;
         console.log(`\n👤 Creating Patient: ${p.name} (${uid})...`);
 
-        // 1. Create User Document
+        // 1. Create User Document (NOW WITH NAME!)
         await setDoc(doc(db, "users", uid), {
             email: p.email,
+            displayName: p.name, // <--- 🟢 ADDED THIS LINE
             doctorId: DOCTOR_UID,
             createdAt: new Date(),
             lastActive: new Date()
